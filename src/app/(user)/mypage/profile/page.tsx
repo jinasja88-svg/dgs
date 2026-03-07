@@ -13,21 +13,30 @@ export default function ProfilePage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const supabase = createClient();
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      let { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (!user) { setLoadError('로그인이 필요합니다.'); return; }
+
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
       if (!data) {
-        const { data: created } = await supabase.from('profiles').upsert({
+        const res = await supabase.from('profiles').upsert({
           id: user.id,
           email: user.email || '',
           name: user.user_metadata?.full_name || user.user_metadata?.name || '',
           avatar_url: user.user_metadata?.avatar_url || null,
         }).select().single();
-        data = created;
+        data = res.data;
+        error = res.error;
+      }
+
+      if (error && !data) {
+        setLoadError(`프로필 로드 실패: ${error.message}`);
+        return;
       }
       if (data) {
         const p = data as Profile;
@@ -41,7 +50,10 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile) {
+      toast.error('프로필이 아직 로드되지 않았습니다.');
+      return;
+    }
     setIsSaving(true);
 
     const { error } = await supabase
@@ -50,7 +62,7 @@ export default function ProfilePage() {
       .eq('id', profile.id);
 
     if (error) {
-      toast.error('저장에 실패했습니다.');
+      toast.error(`저장 실패: ${error.message}`);
     } else {
       toast.success('프로필이 저장되었습니다.');
     }
@@ -62,6 +74,12 @@ export default function ProfilePage() {
       <Breadcrumb items={[{ label: '마이페이지', href: '/mypage' }, { label: '프로필 편집' }]} />
 
       <h1 className="text-2xl font-bold text-text-primary mt-6 mb-8">프로필 편집</h1>
+
+      {loadError && (
+        <div className="mb-6 p-3 bg-danger-5 border border-danger/20 rounded-[var(--radius-md)] text-sm text-danger">
+          {loadError}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <Input label="이메일" value={profile?.email || ''} disabled />
