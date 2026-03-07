@@ -19,7 +19,7 @@ export default function SourcingOrdersPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Breadcrumb items={[{ label: '홈', href: '/' }, { label: '소싱 주문 내역' }]} />
 
-      <h1 className="font-heading text-2xl font-bold text-text-primary mt-6 mb-8">소싱 주문 내역</h1>
+      <h1 className="text-2xl font-bold text-text-primary mt-6 mb-8">소싱 주문 내역</h1>
 
       {isLoading ? (
         <div className="space-y-4">
@@ -33,7 +33,7 @@ export default function SourcingOrdersPage() {
           <p className="text-text-tertiary mb-4">아직 소싱 주문이 없습니다.</p>
           <Link
             href="/shop"
-            className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-[var(--radius-md)] font-medium hover:bg-primary-hover transition-colors"
+            className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-[var(--radius-md)] font-medium hover:bg-primary-60 transition-colors"
           >
             소싱하러 가기
           </Link>

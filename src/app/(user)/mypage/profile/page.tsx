@@ -52,7 +52,7 @@ export default function ProfilePage() {
     <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Breadcrumb items={[{ label: '마이페이지', href: '/mypage' }, { label: '프로필 편집' }]} />
 
-      <h1 className="font-heading text-2xl font-bold text-text-primary mt-6 mb-8">프로필 편집</h1>
+      <h1 className="text-2xl font-bold text-text-primary mt-6 mb-8">프로필 편집</h1>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <Input label="이메일" value={profile?.email || ''} disabled />

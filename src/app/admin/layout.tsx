@@ -20,7 +20,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-[calc(100vh-64px)]">
       <aside className="w-56 bg-white border-r border-border hidden lg:block flex-shrink-0">
         <div className="p-4 border-b border-border">
-          <h2 className="font-heading text-sm font-bold text-primary">관리자 패널</h2>
+          <h2 className="text-sm font-bold text-primary">관리자 패널</h2>
         </div>
         <nav className="py-2">
           {adminNavItems.map((item) => (
@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               className={cn(
                 'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
                 pathname === item.href
-                  ? 'bg-primary-bg text-primary font-medium'
+                  ? 'bg-primary-5 text-primary font-medium'
                   : 'text-text-secondary hover:bg-surface'
               )}
             >

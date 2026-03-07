@@ -12,7 +12,7 @@ function CheckoutContent() {
   return (
     <div className="max-w-lg mx-auto px-4 py-12 text-center">
       <ShieldCheck className="w-12 h-12 text-primary mx-auto mb-4" />
-      <h1 className="font-heading text-2xl font-bold mb-4">결제</h1>
+      <h1 className="text-2xl font-bold mb-4">결제</h1>
       {orderId ? (
         <div className="bg-surface rounded-[var(--radius-lg)] p-6 mb-6">
           <p className="text-sm text-text-secondary mb-2">주문번호: {orderId}</p>

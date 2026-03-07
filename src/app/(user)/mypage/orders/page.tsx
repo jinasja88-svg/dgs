@@ -18,7 +18,7 @@ export default function OrdersPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Breadcrumb items={[{ label: '마이페이지', href: '/mypage' }, { label: '주문 내역' }]} />
 
-      <h1 className="font-heading text-2xl font-bold text-text-primary mt-6 mb-8">주문 내역</h1>
+      <h1 className="text-2xl font-bold text-text-primary mt-6 mb-8">주문 내역</h1>
 
       {isLoading ? (
         <div className="space-y-4">

@@ -43,7 +43,7 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-6">관리자 대시보드</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-6">관리자 대시보드</h1>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {cards.map((card) => (
@@ -60,7 +60,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="bg-white rounded-[var(--radius-lg)] p-6 shadow-card">
-        <h2 className="font-heading text-lg font-semibold mb-4">빠른 안내</h2>
+        <h2 className="text-lg font-semibold mb-4">빠른 안내</h2>
         <ul className="text-sm text-text-secondary space-y-2">
           <li>* 소싱 주문 관리에서 주문 상태를 변경하고 운송장을 입력할 수 있습니다.</li>
           <li>* 사용자 관리에서 가입된 사용자 목록을 확인할 수 있습니다.</li>

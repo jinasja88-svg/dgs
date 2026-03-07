@@ -55,7 +55,7 @@ export default function Header() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="font-heading text-xl font-bold text-primary">
+            <Link href="/" className="text-xl font-bold text-primary">
               딸깍소싱
             </Link>
 
@@ -96,7 +96,7 @@ export default function Header() {
               ) : (
                 <Link
                   href="/login"
-                  className="hidden md:inline-flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-[var(--radius-md)] hover:bg-primary-hover transition-colors"
+                  className="hidden md:inline-flex items-center px-4 py-2 bg-primary text-white text-[15px] font-bold rounded-[var(--radius-md)] hover:bg-primary-60 transition-colors"
                 >
                   로그인
                 </Link>

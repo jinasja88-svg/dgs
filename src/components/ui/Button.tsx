@@ -4,7 +4,7 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'tertiary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,18 +13,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
+/* KRDS Button Styles */
 const variantStyles: Record<Variant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-hover shadow-sm',
-  secondary: 'bg-primary-bg text-primary hover:bg-primary-bg/80',
-  outline: 'border border-border text-text-primary hover:bg-surface',
-  ghost: 'text-text-secondary hover:bg-surface',
-  danger: 'bg-danger text-white hover:bg-danger/90',
+  primary: 'bg-primary text-white hover:bg-primary-60 active:bg-primary-70',
+  secondary: 'bg-primary-5 text-primary border border-primary hover:bg-primary-10 active:bg-primary-20',
+  tertiary: 'bg-transparent text-text-secondary border border-border-dark hover:bg-gray-5 active:bg-gray-10',
+  ghost: 'text-text-secondary hover:bg-secondary-5 active:bg-secondary-10',
+  danger: 'bg-danger text-white hover:bg-danger-60 active:bg-danger-60',
 };
 
 const sizeStyles: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm rounded-[var(--radius-sm)]',
-  md: 'px-5 py-2.5 text-sm rounded-[var(--radius-md)]',
-  lg: 'px-7 py-3 text-base rounded-[var(--radius-md)]',
+  sm: 'px-3 py-1.5 text-[15px] rounded-[var(--radius-sm)]',
+  md: 'px-5 py-2.5 text-[15px] rounded-[var(--radius-md)]',
+  lg: 'px-7 py-3 text-[17px] rounded-[var(--radius-md)]',
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -33,7 +34,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center font-medium transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+          'inline-flex items-center justify-center font-bold leading-[150%] transition-colors duration-200 cursor-pointer',
+          'disabled:bg-gray-20 disabled:text-gray-50 disabled:border-gray-30 disabled:cursor-not-allowed',
           variantStyles[variant],
           sizeStyles[size],
           className

@@ -23,7 +23,7 @@ export default function ContactPage() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Breadcrumb items={[{ label: '홈', href: '/' }, { label: '문의하기' }]} />
 
-      <h1 className="font-heading text-3xl font-bold text-text-primary mt-6 mb-2">문의하기</h1>
+      <h1 className="text-3xl font-bold text-text-primary mt-6 mb-2">문의하기</h1>
       <p className="text-text-tertiary mb-8">
         궁금한 점이 있으시면 아래 양식을 작성해주세요.
       </p>

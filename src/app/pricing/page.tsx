@@ -17,7 +17,7 @@ export default function PricingPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="text-center mb-16">
-        <h1 className="font-heading text-3xl md:text-4xl font-bold text-text-primary mb-4">
+        <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-4">
           투명한 요금 안내
         </h1>
         <p className="text-lg text-text-secondary">
@@ -27,13 +27,13 @@ export default function PricingPage() {
 
       <div className="max-w-lg mx-auto bg-white border-2 border-primary rounded-[var(--radius-xl)] overflow-hidden shadow-lg">
         <div className="bg-primary px-8 py-6 text-center">
-          <h2 className="font-heading text-xl font-bold text-white mb-1">소싱 대행 서비스</h2>
+          <h2 className="text-xl font-bold text-white mb-1">소싱 대행 서비스</h2>
           <p className="text-white/80 text-sm">누구나 이용 가능</p>
         </div>
         <div className="px-8 py-8">
           <div className="text-center mb-8">
             <div className="flex items-baseline justify-center gap-1">
-              <span className="text-5xl font-bold text-primary font-heading">12</span>
+              <span className="text-5xl font-bold text-primary">12</span>
               <span className="text-2xl font-bold text-primary">%</span>
             </div>
             <p className="text-sm text-text-tertiary mt-2">상품 금액 기준 서비스 수수료</p>
@@ -48,7 +48,7 @@ export default function PricingPage() {
           <div className="space-y-3 mb-8">
             {features.map((feature) => (
               <div key={feature} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-primary-bg flex items-center justify-center flex-shrink-0">
+                <div className="w-5 h-5 rounded-full bg-primary-5 flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-primary" />
                 </div>
                 <span className="text-sm text-text-secondary">{feature}</span>
@@ -58,7 +58,7 @@ export default function PricingPage() {
 
           <Link
             href="/shop"
-            className="block w-full text-center py-3.5 bg-primary text-white font-semibold rounded-[var(--radius-md)] hover:bg-primary-hover transition-colors"
+            className="block w-full text-center py-3.5 bg-primary text-white font-semibold rounded-[var(--radius-md)] hover:bg-primary-60 transition-colors"
           >
             소싱 시작하기
           </Link>
@@ -66,7 +66,7 @@ export default function PricingPage() {
       </div>
 
       <div className="mt-12 bg-surface rounded-[var(--radius-xl)] p-8">
-        <h3 className="font-heading text-lg font-semibold mb-4 text-center">요금 계산 예시</h3>
+        <h3 className="text-lg font-semibold mb-4 text-center">요금 계산 예시</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

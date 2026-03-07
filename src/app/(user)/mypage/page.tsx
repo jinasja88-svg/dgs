@@ -51,11 +51,11 @@ export default function MyPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-6">마이페이지</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-6">마이페이지</h1>
 
       {/* Profile summary */}
       <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6 mb-6 flex items-center gap-4">
-        <div className="w-14 h-14 bg-primary-bg rounded-full flex items-center justify-center">
+        <div className="w-14 h-14 bg-primary-5 rounded-full flex items-center justify-center">
           <User className="w-7 h-7 text-primary" />
         </div>
         <div className="flex-1">
@@ -107,7 +107,7 @@ export default function MyPage() {
       </div>
 
       {/* Recent orders */}
-      <h2 className="font-heading text-lg font-semibold mb-4">최근 소싱 주문</h2>
+      <h2 className="text-lg font-semibold mb-4">최근 소싱 주문</h2>
       {!orders.length ? (
         <p className="text-sm text-text-tertiary py-8 text-center">주문 내역이 없습니다.</p>
       ) : (

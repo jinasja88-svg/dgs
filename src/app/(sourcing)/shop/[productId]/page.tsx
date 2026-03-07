@@ -123,7 +123,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
         {/* Info */}
         <div>
-          <h1 className="font-heading text-2xl font-bold text-text-primary mb-1">{product.title}</h1>
+          <h1 className="text-2xl font-bold text-text-primary mb-1">{product.title}</h1>
           {product.title_zh && (
             <p className="text-sm text-text-tertiary mb-4">{product.title_zh}</p>
           )}
@@ -154,7 +154,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                     className={cn(
                       'px-4 py-2 border rounded-[var(--radius-md)] text-sm transition-colors',
                       selectedSku === sku.sku_id
-                        ? 'border-primary bg-primary-bg text-primary font-medium'
+                        ? 'border-primary bg-primary-5 text-primary font-medium'
                         : 'border-border text-text-secondary hover:border-primary'
                     )}
                   >

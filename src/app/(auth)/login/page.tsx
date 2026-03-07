@@ -22,7 +22,7 @@ function LoginContent() {
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="font-heading text-2xl font-bold text-text-primary mb-2">로그인</h1>
+          <h1 className="text-2xl font-bold text-text-primary mb-2">로그인</h1>
           <p className="text-sm text-text-tertiary">소셜 계정으로 간편하게 시작하세요</p>
         </div>
 

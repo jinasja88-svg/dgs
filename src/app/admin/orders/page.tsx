@@ -23,7 +23,7 @@ export default function AdminOrdersPage() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-6">일반 주문 관리</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-6">일반 주문 관리</h1>
 
       {!orders.length ? (
         <p className="text-text-tertiary text-center py-12">주문이 없습니다.</p>

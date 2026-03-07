@@ -12,12 +12,12 @@ function FailContent() {
   return (
     <div className="max-w-lg mx-auto px-4 py-20 text-center">
       <XCircle className="w-16 h-16 text-danger mx-auto mb-6" />
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-2">결제 실패</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-2">결제 실패</h1>
       <p className="text-text-secondary mb-8">{message}</p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Link
           href="/shop"
-          className="px-6 py-3 bg-primary text-white rounded-[var(--radius-md)] font-medium hover:bg-primary-hover transition-colors"
+          className="px-6 py-3 bg-primary text-white rounded-[var(--radius-md)] font-medium hover:bg-primary-60 transition-colors"
         >
           다시 시도하기
         </Link>

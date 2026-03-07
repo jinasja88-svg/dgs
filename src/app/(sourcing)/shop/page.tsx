@@ -44,7 +44,7 @@ export default function ShopPage() {
       <Breadcrumb items={[{ label: '홈', href: '/' }, { label: '소싱하기' }]} />
 
       <div className="mt-6 mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text-primary mb-2">1688 상품 검색</h1>
+        <h1 className="text-3xl font-bold text-text-primary mb-2">1688 상품 검색</h1>
         <p className="text-text-tertiary">중국 1688에서 원하는 상품을 찾아보세요</p>
       </div>
 
@@ -71,7 +71,7 @@ export default function ShopPage() {
         <button
           onClick={() => { setSelectedCategory(''); setPage(1); }}
           className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-            !selectedCategory ? 'bg-primary text-white' : 'bg-surface text-text-secondary hover:bg-primary-bg'
+            !selectedCategory ? 'bg-primary text-white' : 'bg-surface text-text-secondary hover:bg-primary-5'
           }`}
         >
           전체
@@ -83,7 +83,7 @@ export default function ShopPage() {
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               selectedCategory === cat.name
                 ? 'bg-primary text-white'
-                : 'bg-surface text-text-secondary hover:bg-primary-bg'
+                : 'bg-surface text-text-secondary hover:bg-primary-5'
             }`}
           >
             {cat.icon} {cat.name}

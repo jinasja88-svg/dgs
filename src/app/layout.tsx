@@ -1,15 +1,8 @@
 import type { Metadata } from 'next';
-import { Montserrat } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  variable: '--font-heading',
-  weight: ['400', '500', '600', '700', '800'],
-});
 
 export const metadata: Metadata = {
   title: {
@@ -26,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={`${montserrat.variable} antialiased`}>
+      <body className="antialiased">
         <Providers>
           <Header />
           <main className="min-h-[calc(100vh-64px)]">{children}</main>

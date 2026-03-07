@@ -12,13 +12,13 @@ function SuccessContent() {
   return (
     <div className="max-w-lg mx-auto px-4 py-20 text-center">
       <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-6" />
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-2">결제 완료!</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-2">결제 완료!</h1>
       <p className="text-text-secondary mb-2">주문이 성공적으로 처리되었습니다.</p>
       {orderId && <p className="text-sm text-text-tertiary mb-8">주문번호: {orderId}</p>}
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Link
           href="/sourcing-orders"
-          className="px-6 py-3 bg-primary text-white rounded-[var(--radius-md)] font-medium hover:bg-primary-hover transition-colors"
+          className="px-6 py-3 bg-primary text-white rounded-[var(--radius-md)] font-medium hover:bg-primary-60 transition-colors"
         >
           주문 내역 보기
         </Link>

@@ -99,7 +99,7 @@ export default function SourcingOrderDetailPage({ params }: { params: Promise<{ 
       </Link>
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-heading text-xl font-bold">{order.order_number}</h1>
+        <h1 className="text-xl font-bold">{order.order_number}</h1>
         <Badge status={order.status} />
       </div>
 

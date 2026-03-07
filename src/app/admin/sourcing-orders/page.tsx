@@ -63,7 +63,7 @@ export default function AdminSourcingOrdersPage() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-6">소싱 주문 관리</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-6">소싱 주문 관리</h1>
 
       {!orders.length ? (
         <p className="text-text-tertiary text-center py-12">주문이 없습니다.</p>
@@ -90,7 +90,7 @@ export default function AdminSourcingOrdersPage() {
                     <td className="px-4 py-3 text-text-tertiary">{formatDate(order.created_at)}</td>
                     <td className="px-4 py-3 text-text-tertiary">{order.tracking_number || '-'}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button size="sm" variant="outline" onClick={() => openEditModal(order)}>
+                      <Button size="sm" variant="tertiary" onClick={() => openEditModal(order)}>
                         수정
                       </Button>
                     </td>
@@ -136,7 +136,7 @@ export default function AdminSourcingOrdersPage() {
             />
           </div>
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" onClick={() => setSelectedOrder(null)}>취소</Button>
+            <Button variant="tertiary" onClick={() => setSelectedOrder(null)}>취소</Button>
             <Button onClick={handleUpdate} isLoading={isUpdating}>저장</Button>
           </div>
         </div>

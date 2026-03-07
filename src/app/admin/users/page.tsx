@@ -23,7 +23,7 @@ export default function AdminUsersPage() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-text-primary mb-6">사용자 관리</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-6">사용자 관리</h1>
 
       {!users.length ? (
         <p className="text-text-tertiary text-center py-12">사용자가 없습니다.</p>
@@ -45,7 +45,7 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3">{user.email}</td>
                     <td className="px-4 py-3">{user.name || '-'}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-bg text-primary">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-5 text-primary">
                         {getPlanLabel(user.subscription_plan)}
                       </span>
                     </td>

@@ -20,7 +20,7 @@ export default async function NoticesPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Breadcrumb items={[{ label: '홈', href: '/' }, { label: '공지사항' }]} />
 
-      <h1 className="font-heading text-3xl font-bold text-text-primary mt-6 mb-8">공지사항</h1>
+      <h1 className="text-3xl font-bold text-text-primary mt-6 mb-8">공지사항</h1>
 
       {!notices?.length ? (
         <p className="text-text-tertiary text-center py-12">등록된 공지사항이 없습니다.</p>

@@ -32,7 +32,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="font-heading text-xl font-bold text-primary">
+            <Link href="/" className="text-xl font-bold text-primary">
               딸깍소싱
             </Link>
             <p className="mt-3 text-sm text-text-tertiary leading-relaxed">

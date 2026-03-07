@@ -34,7 +34,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
       </Link>
 
       <article className="bg-white border border-border rounded-[var(--radius-lg)] p-8">
-        <h1 className="font-heading text-2xl font-bold text-text-primary mb-2">{n.title}</h1>
+        <h1 className="text-2xl font-bold text-text-primary mb-2">{n.title}</h1>
         <p className="text-xs text-text-tertiary mb-8">{formatDate(n.created_at)}</p>
         <div className="prose prose-sm max-w-none text-text-secondary leading-relaxed whitespace-pre-wrap">
           {n.content}

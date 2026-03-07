@@ -28,12 +28,12 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-primary-light py-24 md:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-primary-60 py-24 md:py-32">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-40" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="font-heading text-4xl md:text-6xl font-bold text-white mb-6 animate-fade-in-up">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 animate-fade-in-up">
             1688 중국 소싱,<br />
-            <span className="text-primary-bg">딸깍 한 번이면 끝</span>
+            <span className="text-primary-5">딸깍 한 번이면 끝</span>
           </h1>
           <p className="text-lg md:text-xl text-white/80 mb-10 max-w-2xl mx-auto animate-fade-in-up delay-1">
             투명한 수수료 12%, 실시간 환율, 주문부터 배송까지<br className="hidden sm:block" />
@@ -61,7 +61,7 @@ export default function HomePage() {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold text-text-primary mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-4">
               이용 방법
             </h2>
             <p className="text-text-secondary text-lg">4단계로 간편하게 소싱하세요</p>
@@ -69,11 +69,11 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {steps.map((step, i) => (
               <div key={i} className="text-center group">
-                <div className="w-16 h-16 mx-auto mb-4 bg-primary-bg rounded-2xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors duration-200">
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary-5 rounded-2xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors duration-200">
                   <step.icon className="w-7 h-7 text-primary group-hover:text-white transition-colors" />
                 </div>
                 <div className="text-xs font-semibold text-primary mb-2">STEP {i + 1}</div>
-                <h3 className="font-heading text-lg font-semibold mb-2">{step.title}</h3>
+                <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
                 <p className="text-sm text-text-tertiary">{step.desc}</p>
               </div>
             ))}
@@ -85,7 +85,7 @@ export default function HomePage() {
       <section className="py-20 bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold text-text-primary mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-4">
               왜 딸깍소싱인가요?
             </h2>
             <p className="text-text-secondary text-lg">차별화된 소싱 경험을 제공합니다</p>
@@ -96,11 +96,11 @@ export default function HomePage() {
                 key={i}
                 className="flex items-start gap-4 p-6 bg-white rounded-[var(--radius-lg)] shadow-card hover:shadow-card-hover transition-shadow duration-200"
               >
-                <div className="w-12 h-12 flex-shrink-0 bg-primary-bg rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 flex-shrink-0 bg-primary-5 rounded-xl flex items-center justify-center">
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-heading text-lg font-semibold mb-1">{feature.title}</h3>
+                  <h3 className="text-lg font-semibold mb-1">{feature.title}</h3>
                   <p className="text-sm text-text-tertiary">{feature.desc}</p>
                 </div>
               </div>
@@ -113,7 +113,7 @@ export default function HomePage() {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold text-text-primary mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-4">
               인기 카테고리
             </h2>
           </div>
@@ -122,7 +122,7 @@ export default function HomePage() {
               <Link
                 key={cat.name}
                 href={`/shop?category=${encodeURIComponent(cat.name)}`}
-                className="flex flex-col items-center gap-3 p-6 bg-surface rounded-[var(--radius-lg)] hover:bg-primary-bg hover:shadow-md transition-all duration-200"
+                className="flex flex-col items-center gap-3 p-6 bg-surface rounded-[var(--radius-lg)] hover:bg-primary-5 hover:shadow-md transition-all duration-200"
               >
                 <span className="text-3xl">{cat.emoji}</span>
                 <span className="text-sm font-medium text-text-secondary">{cat.name}</span>
@@ -135,7 +135,7 @@ export default function HomePage() {
       {/* CTA */}
       <section className="py-20 bg-primary">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="font-heading text-3xl md:text-4xl font-bold text-white mb-6">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             지금 바로 소싱을 시작하세요
           </h2>
           <p className="text-white/80 text-lg mb-8">
