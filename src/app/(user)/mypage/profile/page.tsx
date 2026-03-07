@@ -19,7 +19,16 @@ export default function ProfilePage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      let { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (!data) {
+        const { data: created } = await supabase.from('profiles').upsert({
+          id: user.id,
+          email: user.email || '',
+          name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+          avatar_url: user.user_metadata?.avatar_url || null,
+        }).select().single();
+        data = created;
+      }
       if (data) {
         const p = data as Profile;
         setProfile(p);

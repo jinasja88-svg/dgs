@@ -25,7 +25,17 @@ export default function MyPage() {
         supabase.from('sourcing_orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
       ]);
 
-      if (profileRes.data) setProfile(profileRes.data as Profile);
+      let profileData = profileRes.data;
+      if (!profileData) {
+        const { data: created } = await supabase.from('profiles').upsert({
+          id: user.id,
+          email: user.email || '',
+          name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+          avatar_url: user.user_metadata?.avatar_url || null,
+        }).select().single();
+        profileData = created;
+      }
+      if (profileData) setProfile(profileData as Profile);
       if (ordersRes.data) setOrders(ordersRes.data as SourcingOrder[]);
       setLoading(false);
     }
