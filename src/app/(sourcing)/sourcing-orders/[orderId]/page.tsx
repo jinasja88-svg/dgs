@@ -1,0 +1,182 @@
+'use client';
+
+import { use } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, CheckCircle2, Circle, Truck } from 'lucide-react';
+import Link from 'next/link';
+import Badge from '@/components/ui/Badge';
+import Breadcrumb from '@/components/ui/Breadcrumb';
+import Skeleton from '@/components/ui/Skeleton';
+import { formatPrice, formatDate, getSourcingStatusLabel } from '@/lib/utils';
+import type { SourcingOrder, SourcingOrderStatus } from '@/types';
+
+const STATUS_FLOW: SourcingOrderStatus[] = ['pending', 'paid', 'purchasing', 'shipping', 'delivered'];
+
+function StatusTimeline({ currentStatus }: { currentStatus: SourcingOrderStatus }) {
+  if (currentStatus === 'cancelled') {
+    return (
+      <div className="flex items-center gap-2 p-4 bg-red-50 rounded-[var(--radius-md)] text-sm text-danger">
+        <Circle className="w-5 h-5" /> 주문이 취소되었습니다.
+      </div>
+    );
+  }
+
+  const currentIndex = STATUS_FLOW.indexOf(currentStatus);
+
+  return (
+    <div className="flex items-center justify-between py-4">
+      {STATUS_FLOW.map((status, i) => (
+        <div key={status} className="flex flex-col items-center flex-1">
+          <div className="flex items-center w-full">
+            {i > 0 && (
+              <div className={`flex-1 h-0.5 ${i <= currentIndex ? 'bg-primary' : 'bg-border'}`} />
+            )}
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                i <= currentIndex ? 'bg-primary text-white' : 'bg-surface text-text-tertiary'
+              }`}
+            >
+              {i < currentIndex ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : i === currentIndex ? (
+                <Truck className="w-4 h-4" />
+              ) : (
+                <Circle className="w-4 h-4" />
+              )}
+            </div>
+            {i < STATUS_FLOW.length - 1 && (
+              <div className={`flex-1 h-0.5 ${i < currentIndex ? 'bg-primary' : 'bg-border'}`} />
+            )}
+          </div>
+          <span className={`text-xs mt-2 ${i <= currentIndex ? 'text-primary font-medium' : 'text-text-tertiary'}`}>
+            {getSourcingStatusLabel(status)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function SourcingOrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
+  const { orderId } = use(params);
+
+  const { data: order, isLoading } = useQuery<SourcingOrder>({
+    queryKey: ['sourcing-order', orderId],
+    queryFn: () => fetch(`/api/sourcing/orders/${orderId}`).then((r) => r.json()),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
+        <Skeleton className="h-8 w-1/2" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-40" />
+      </div>
+    );
+  }
+
+  if (!order || 'error' in order) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        <p className="text-text-tertiary mb-4">주문을 찾을 수 없습니다.</p>
+        <Link href="/sourcing-orders" className="text-primary hover:underline">돌아가기</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Breadcrumb
+        items={[
+          { label: '홈', href: '/' },
+          { label: '소싱 주문', href: '/sourcing-orders' },
+          { label: order.order_number },
+        ]}
+      />
+
+      <Link href="/sourcing-orders" className="inline-flex items-center gap-1 text-sm text-text-tertiary hover:text-primary mt-4 mb-6 transition-colors">
+        <ArrowLeft className="w-4 h-4" /> 목록으로
+      </Link>
+
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-heading text-xl font-bold">{order.order_number}</h1>
+        <Badge status={order.status} />
+      </div>
+
+      {/* Timeline */}
+      <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6 mb-6">
+        <h2 className="text-sm font-semibold mb-4">주문 상태</h2>
+        <StatusTimeline currentStatus={order.status} />
+        {order.tracking_number && (
+          <div className="mt-4 p-3 bg-surface rounded-[var(--radius-md)] text-sm">
+            <span className="text-text-tertiary">운송장 번호: </span>
+            <span className="font-medium">{order.tracking_number}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Items */}
+      <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6 mb-6">
+        <h2 className="text-sm font-semibold mb-4">주문 상품</h2>
+        <div className="space-y-3">
+          {order.items.map((item, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-surface rounded-[var(--radius-sm)] flex items-center justify-center text-2xl flex-shrink-0">
+                📦
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{item.title}</p>
+                {item.sku_name && <p className="text-xs text-text-tertiary">{item.sku_name}</p>}
+                <p className="text-xs text-text-tertiary">수량: {item.quantity}개</p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="font-medium">{formatPrice(item.price_krw * item.quantity)}</p>
+                <p className="text-xs text-text-tertiary">¥{item.price_cny * item.quantity}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Price Summary */}
+      <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6 mb-6">
+        <h2 className="text-sm font-semibold mb-4">결제 정보</h2>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-text-secondary">상품 금액</span>
+            <span>{formatPrice(order.total_krw)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-secondary">서비스 수수료</span>
+            <span>{formatPrice(order.service_fee)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-secondary">배송비</span>
+            <span>{formatPrice(order.shipping_fee)}</span>
+          </div>
+          <div className="border-t border-border pt-2 flex justify-between font-bold text-base">
+            <span>총 결제 금액</span>
+            <span className="text-primary">
+              {formatPrice(order.total_krw + order.service_fee + order.shipping_fee)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Order info */}
+      <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6">
+        <h2 className="text-sm font-semibold mb-4">주문 정보</h2>
+        <dl className="grid grid-cols-2 gap-y-2 text-sm">
+          <dt className="text-text-tertiary">주문일</dt>
+          <dd>{formatDate(order.created_at)}</dd>
+          {order.shipping_address && (
+            <>
+              <dt className="text-text-tertiary">배송지</dt>
+              <dd>{order.shipping_address.address} {order.shipping_address.detail_address}</dd>
+            </>
+          )}
+        </dl>
+      </div>
+    </div>
+  );
+}
