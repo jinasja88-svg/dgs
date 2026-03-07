@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -8,6 +9,19 @@ function LoginContent() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/mypage';
+  const queryError = searchParams.get('error');
+  const [hashError, setHashError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const params = new URLSearchParams(hash.substring(1));
+      const desc = params.get('error_description');
+      if (desc) setHashError(decodeURIComponent(desc));
+    }
+  }, []);
+
+  const errorMessage = hashError || (queryError === 'auth_failed' ? '로그인에 실패했습니다. 다시 시도해주세요.' : null);
 
   const handleOAuth = async (provider: 'google' | 'kakao') => {
     await supabase.auth.signInWithOAuth({
@@ -25,6 +39,12 @@ function LoginContent() {
           <h1 className="text-2xl font-bold text-text-primary mb-2">로그인</h1>
           <p className="text-sm text-text-tertiary">소셜 계정으로 간편하게 시작하세요</p>
         </div>
+
+        {errorMessage && (
+          <div className="mb-6 p-3 bg-danger-5 border border-danger/20 rounded-[var(--radius-md)] text-sm text-danger">
+            {errorMessage}
+          </div>
+        )}
 
         <div className="space-y-3">
           <button
