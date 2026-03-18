@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "cbu01.alicdn.com",
+        hostname: "**.alicdn.com",
       },
       {
         protocol: "https",

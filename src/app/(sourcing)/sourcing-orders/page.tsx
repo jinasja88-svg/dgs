@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Package } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
-import Breadcrumb from '@/components/ui/Breadcrumb';
 import Skeleton from '@/components/ui/Skeleton';
 import { formatPrice, formatDate } from '@/lib/utils';
 import type { SourcingOrder } from '@/types';
@@ -16,10 +15,11 @@ export default function SourcingOrdersPage() {
   });
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Breadcrumb items={[{ label: '홈', href: '/' }, { label: '소싱 주문 내역' }]} />
-
-      <h1 className="text-2xl font-bold text-text-primary mt-6 mb-8">소싱 주문 내역</h1>
+    <div className="p-6 lg:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-text-primary">내주문목록</h1>
+        <p className="text-sm text-text-tertiary mt-1">소싱 주문 내역을 확인하세요</p>
+      </div>
 
       {isLoading ? (
         <div className="space-y-4">

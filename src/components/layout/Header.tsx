@@ -10,11 +10,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import MobileMenu from './MobileMenu';
 
 const navItems = [
-  { label: '소싱하기', href: '/shop' },
-  { label: '요금 안내', href: '/pricing' },
-  { label: '서비스 소개', href: '/about' },
-  { label: 'FAQ', href: '/faq' },
-  { label: '문의하기', href: '/contact' },
+  { label: '딸깍소싱', href: '/shop' },
 ];
 
 export default function Header() {

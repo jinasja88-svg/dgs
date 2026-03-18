@@ -77,12 +77,12 @@ export default function PricingPage() {
             </thead>
             <tbody>
               <tr className="border-b border-border-light">
-                <td className="py-3 px-4 text-text-secondary">상품 금액 (¥100 x 185원)</td>
-                <td className="py-3 px-4 text-right">₩18,500</td>
+                <td className="py-3 px-4 text-text-secondary">상품 금액 (¥100 x 208원)</td>
+                <td className="py-3 px-4 text-right">₩20,800</td>
               </tr>
               <tr className="border-b border-border-light">
                 <td className="py-3 px-4 text-text-secondary">서비스 수수료 (12%)</td>
-                <td className="py-3 px-4 text-right">₩2,220</td>
+                <td className="py-3 px-4 text-right">₩2,496</td>
               </tr>
               <tr className="border-b border-border-light">
                 <td className="py-3 px-4 text-text-secondary">국내 배송비</td>
@@ -90,7 +90,7 @@ export default function PricingPage() {
               </tr>
               <tr className="font-bold">
                 <td className="py-3 px-4">총 결제 금액</td>
-                <td className="py-3 px-4 text-right text-primary">₩23,720</td>
+                <td className="py-3 px-4 text-right text-primary">₩26,296</td>
               </tr>
             </tbody>
           </table>

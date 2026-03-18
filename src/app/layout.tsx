@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Providers from './providers';
 import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
   title: {
@@ -22,8 +21,7 @@ export default function RootLayout({
       <body className="antialiased">
         <Providers>
           <Header />
-          <main className="min-h-[calc(100vh-64px)]">{children}</main>
-          <Footer />
+          <div className="min-h-[calc(100vh-64px)]">{children}</div>
         </Providers>
       </body>
     </html>

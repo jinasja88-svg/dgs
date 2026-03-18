@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { X, ShoppingBag, User, LogOut, Home, HelpCircle, Phone, Info, CreditCard } from 'lucide-react';
+import { X, Search, FileText, Heart, ClipboardList, User, LogOut } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface MobileMenuProps {
@@ -12,12 +12,10 @@ interface MobileMenuProps {
 }
 
 const menuItems = [
-  { label: '홈', href: '/', icon: Home },
-  { label: '소싱하기', href: '/shop', icon: ShoppingBag },
-  { label: '요금 안내', href: '/pricing', icon: CreditCard },
-  { label: '서비스 소개', href: '/about', icon: Info },
-  { label: 'FAQ', href: '/faq', icon: HelpCircle },
-  { label: '문의하기', href: '/contact', icon: Phone },
+  { label: '아이템검색', href: '/shop', icon: Search },
+  { label: '상세페이지 생성', href: '/detail-generator', icon: FileText },
+  { label: '내찜목록', href: '/wishlist', icon: Heart },
+  { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },
 ];
 
 export default function MobileMenu({ isOpen, onClose, user, onLogout }: MobileMenuProps) {
