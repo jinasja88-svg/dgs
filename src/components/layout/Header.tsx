@@ -2,22 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Menu, User, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import MobileMenu from './MobileMenu';
 
-const navItems = [
-  { label: '딸깍소싱', href: '/shop' },
-];
-
 export default function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const pathname = usePathname();
   const supabase = createClient();
 
   useEffect(() => {
@@ -54,23 +48,6 @@ export default function Header() {
             <Link href="/" className="text-xl font-bold text-primary">
               딸깍소싱
             </Link>
-
-            <nav className="hidden md:flex items-center gap-8">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'text-sm font-medium transition-colors',
-                    pathname === item.href
-                      ? 'text-primary'
-                      : 'text-text-secondary hover:text-primary'
-                  )}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
 
             <div className="flex items-center gap-3">
               {user ? (
