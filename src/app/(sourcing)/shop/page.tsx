@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, ImagePlus, Filter, X, Upload } from 'lucide-react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import Pagination from '@/components/ui/Pagination';
@@ -19,6 +20,7 @@ export default function ShopPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isImageSearching, setIsImageSearching] = useState(false);
   const [imageResults, setImageResults] = useState<SourcingProduct[] | null>(null);
+  const [similarSearchSource, setSimilarSearchSource] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: categories } = useQuery<SourcingCategory[]>({
@@ -41,26 +43,69 @@ export default function ShopPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setImageResults(null);
+    setSimilarSearchSource(null);
     setKeyword(searchInput);
     setPage(1);
   };
 
+  // Image URL 기반 검색 (돋보기 버튼 / URL 직접 입력)
+  const searchByImageUrl = async (imageUrl: string, showAsSource?: boolean) => {
+    setIsImageSearching(true);
+    setImagePreview(imageUrl);
+    setSearchMode('image');
+    if (showAsSource) setSimilarSearchSource(imageUrl);
+    try {
+      const res = await fetch('/api/sourcing/image-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: imageUrl }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+      if (data.data) {
+        setImageResults(data.data);
+      }
+    } catch {
+      toast.error('이미지 검색에 실패했습니다');
+    } finally {
+      setIsImageSearching(false);
+    }
+  };
+
+  // 파일 업로드 기반 검색 (이미지 업로드 영역)
   const handleImageSelect = async (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
     reader.readAsDataURL(file);
 
     setIsImageSearching(true);
+    setSimilarSearchSource(null);
     try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const res = await fetch('/api/sourcing/image-search', { method: 'POST', body: formData });
+      // 파일을 base64 data URL로 변환하여 API에 전달
+      const base64 = await new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/sourcing/image-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: base64 }),
+      });
       const data = await res.json();
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
       if (data.data) {
         setImageResults(data.data);
       }
     } catch {
-      // silently fail
+      toast.error('이미지 검색에 실패했습니다');
     } finally {
       setIsImageSearching(false);
     }
@@ -77,6 +122,7 @@ export default function ShopPage() {
   const clearImageSearch = () => {
     setImagePreview(null);
     setImageResults(null);
+    setSimilarSearchSource(null);
     setSearchMode('keyword');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -183,31 +229,47 @@ export default function ShopPage() {
         )}
       </div>
 
+      {/* Similar Search Source Banner */}
+      {similarSearchSource && imageResults && (
+        <div className="flex items-center gap-3 bg-white border border-border-light rounded-[var(--radius-lg)] p-3 mb-6">
+          <img src={similarSearchSource} alt="" className="w-12 h-12 object-cover rounded-[var(--radius-md)] flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-primary">유사 상품 검색 결과</p>
+            <p className="text-xs text-text-tertiary">이 이미지와 비슷한 상품 {imageResults.length}개를 찾았습니다</p>
+          </div>
+          <button onClick={clearImageSearch} className="text-xs text-primary hover:underline flex-shrink-0">
+            검색 초기화
+          </button>
+        </div>
+      )}
+
       {/* Category Filter */}
-      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
-        <Filter className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-        <button
-          onClick={() => { setSelectedCategory(''); setPage(1); }}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-            !selectedCategory ? 'bg-primary text-white' : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
-          }`}
-        >
-          전체
-        </button>
-        {categories?.map((cat) => (
+      {!imageResults && (
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+          <Filter className="w-4 h-4 text-text-tertiary flex-shrink-0" />
           <button
-            key={cat.id}
-            onClick={() => { setSelectedCategory(cat.name); setPage(1); }}
+            onClick={() => { setSelectedCategory(''); setPage(1); }}
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              selectedCategory === cat.name
-                ? 'bg-primary text-white'
-                : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
+              !selectedCategory ? 'bg-primary text-white' : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
             }`}
           >
-            {cat.icon} {cat.name}
+            전체
           </button>
-        ))}
-      </div>
+          {categories?.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => { setSelectedCategory(cat.name); setPage(1); }}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                selectedCategory === cat.name
+                  ? 'bg-primary text-white'
+                  : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
+              }`}
+            >
+              {cat.icon} {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Results */}
       {isLoading || isImageSearching ? (
@@ -224,20 +286,22 @@ export default function ShopPage() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-text-tertiary">
-              {imageResults ? (
-                <>이미지 검색 결과 <strong className="text-text-primary">{imageResults.length}</strong>개</>
-              ) : (
-                <>총 <strong className="text-text-primary">{result?.total || 0}</strong>개 상품</>
+          {!similarSearchSource && (
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-text-tertiary">
+                {imageResults ? (
+                  <>이미지 검색 결과 <strong className="text-text-primary">{imageResults.length}</strong>개</>
+                ) : (
+                  <>총 <strong className="text-text-primary">{result?.total || 0}</strong>개 상품</>
+                )}
+              </p>
+              {imageResults && (
+                <button onClick={clearImageSearch} className="text-xs text-primary hover:underline">
+                  검색 초기화
+                </button>
               )}
-            </p>
-            {imageResults && (
-              <button onClick={clearImageSearch} className="text-xs text-primary hover:underline">
-                검색 초기화
-              </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {displayProducts.length === 0 ? (
             <div className="bg-white rounded-[var(--radius-lg)] border border-border-light py-20 text-center">
@@ -248,44 +312,64 @@ export default function ShopPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {displayProducts.map((product) => (
-                <Link
+                <div
                   key={product.product_id}
-                  href={`/shop/${product.product_id}`}
-                  className="group bg-white border border-border-light rounded-[var(--radius-lg)] overflow-hidden hover:shadow-card-hover transition-all duration-200"
+                  className="group relative bg-white border border-border-light rounded-[var(--radius-lg)] overflow-hidden hover:shadow-card-hover transition-all duration-200"
                 >
-                  <div className="aspect-square bg-surface flex items-center justify-center overflow-hidden">
-                    {product.images[0] ? (
-                      <img
-                        src={product.images[0]}
-                        alt={product.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <span className="text-4xl text-text-tertiary">📦</span>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="text-sm font-medium text-text-primary line-clamp-2 mb-1 group-hover:text-primary transition-colors">
-                      {product.title}
-                    </h3>
-                    {product.title_zh && (
-                      <p className="text-xs text-text-tertiary line-clamp-1 mb-2">{product.title_zh}</p>
-                    )}
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-base font-bold text-primary">{formatPrice(product.price_krw)}</span>
-                      <span className="text-xs text-text-tertiary">¥{product.price_cny}</span>
+                  <Link href={`/shop/${product.product_id}`}>
+                    <div className="aspect-square bg-surface flex items-center justify-center overflow-hidden relative">
+                      {product.images[0] ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <span className="text-4xl text-text-tertiary">📦</span>
+                      )}
                     </div>
-                    {product.seller && (
-                      <div className="flex items-center gap-1 mt-1.5">
-                        <span className="text-xs text-text-tertiary truncate">{product.seller.name}</span>
-                        <span className="text-xs text-warning">★ {product.seller.rating}</span>
+                  </Link>
+
+                  {/* Magnifying glass - similar image search button */}
+                  {product.images[0] && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        searchByImageUrl(product.images[0], true);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-primary text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 backdrop-blur-sm"
+                      title="유사 상품 검색"
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  <Link href={`/shop/${product.product_id}`}>
+                    <div className="p-3">
+                      <h3 className="text-sm font-medium text-text-primary line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+                        {product.title}
+                      </h3>
+                      {product.title_zh && (
+                        <p className="text-xs text-text-tertiary line-clamp-1 mb-2">{product.title_zh}</p>
+                      )}
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base font-bold text-primary">{formatPrice(product.price_krw)}</span>
+                        <span className="text-xs text-text-tertiary">¥{product.price_cny}</span>
                       </div>
-                    )}
-                    {product.min_order && product.min_order > 1 && (
-                      <p className="text-[11px] text-text-tertiary mt-1">최소 {product.min_order}개</p>
-                    )}
-                  </div>
-                </Link>
+                      {product.seller && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <span className="text-xs text-text-tertiary truncate">{product.seller.name}</span>
+                          <span className="text-xs text-warning">★ {product.seller.rating}</span>
+                        </div>
+                      )}
+                      {product.min_order && product.min_order > 1 && (
+                        <p className="text-[11px] text-text-tertiary mt-1">최소 {product.min_order}개</p>
+                      )}
+                    </div>
+                  </Link>
+                </div>
               ))}
             </div>
           )}
