@@ -1,15 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import {
-  getTmapiClient,
-  tmapiCache,
-  CACHE_TTL,
-  mapSearchItemToSourcingProduct,
-  TmapiRateLimitError,
-  TmapiAuthError,
-  TmapiError,
-} from '@/lib/tmapi';
+import { searchByKeyword, mapSearchItemToProduct } from '@/lib/ali1688';
 import { getExchangeRate } from '@/lib/exchange-rate';
-import type { TmapiSearchResult } from '@/lib/tmapi';
 
 const CATEGORY_KEYWORD_MAP: Record<string, string> = {
   '의류/패션': '服装',
@@ -29,43 +20,31 @@ export async function GET(request: NextRequest) {
   const keyword = searchParams.get('keyword') || '';
   const category = searchParams.get('category') || '';
   const page = parseInt(searchParams.get('page') || '1');
-  const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 20);
+  const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 40);
 
-  // Build search keyword: user keyword + category mapping
+  // 검색 키워드 조합
   let searchKeyword = keyword;
   if (category && CATEGORY_KEYWORD_MAP[category]) {
     const catKeyword = CATEGORY_KEYWORD_MAP[category];
     searchKeyword = keyword ? `${keyword} ${catKeyword}` : catKeyword;
   }
-
   if (!searchKeyword) {
-    searchKeyword = '热销产品'; // default: trending products
+    searchKeyword = '热销产品';
   }
-
-  const cacheKey = `search:${searchKeyword}:${page}:${perPage}`;
-  const cached = tmapiCache.get<TmapiSearchResult>(cacheKey);
 
   try {
     const exchangeRate = await getExchangeRate();
 
-    let result: TmapiSearchResult;
-    if (cached) {
-      result = cached;
-    } else {
-      const client = getTmapiClient();
-      result = await client.searchByKeyword({
-        keyword: searchKeyword,
-        page,
-        page_size: perPage,
-      });
-      tmapiCache.set(cacheKey, result, CACHE_TTL.SEARCH);
-    }
+    const result = await searchByKeyword({
+      keyword: searchKeyword,
+      page,
+      pageSize: perPage,
+    });
 
-    const products = (result.offerList || []).map((item) =>
-      mapSearchItemToSourcingProduct(item, exchangeRate)
+    const products = result.offerList.map((item) =>
+      mapSearchItemToProduct(item, exchangeRate)
     );
 
-    // If category was used, tag products with the category name
     if (category) {
       for (const p of products) {
         p.category = category;
@@ -77,38 +56,11 @@ export async function GET(request: NextRequest) {
       total: result.totalCount || products.length,
       page,
       per_page: perPage,
-      total_pages: Math.ceil((result.totalCount || products.length) / perPage),
+      total_pages: result.pageCount || Math.ceil((result.totalCount || products.length) / perPage),
     });
   } catch (err) {
-    if (err instanceof TmapiRateLimitError) {
-      return NextResponse.json(
-        { error: '잠시 후 다시 시도해주세요' },
-        { status: 429 }
-      );
-    }
-    if (err instanceof TmapiAuthError) {
-      console.error('TMAPI auth error:', err.statusCode);
-      return NextResponse.json(
-        { error: '서비스 오류가 발생했습니다' },
-        { status: 500 }
-      );
-    }
-    if (err instanceof TmapiError) {
-      if (err.statusCode === 408) {
-        return NextResponse.json(
-          { error: '서버 응답 시간 초과' },
-          { status: 504 }
-        );
-      }
-      return NextResponse.json(
-        { error: '상품 정보를 불러올 수 없습니다' },
-        { status: 502 }
-      );
-    }
     console.error('Search error:', err);
-    return NextResponse.json(
-      { error: '상품 검색 중 오류가 발생했습니다' },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : '상품 검색 중 오류가 발생했습니다';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
