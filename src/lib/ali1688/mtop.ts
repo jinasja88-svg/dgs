@@ -27,6 +27,18 @@ async function proxiedFetch(url: string, options: RequestInit = {}): Promise<Res
   return fetch(url, options);
 }
 
+// Set-Cookie 헤더 추출 (undici ProxyAgent 호환성 포함)
+function extractSetCookies(headers: Headers): string[] {
+  if (typeof (headers as { getSetCookie?: () => string[] }).getSetCookie === 'function') {
+    return (headers as { getSetCookie: () => string[] }).getSetCookie();
+  }
+  const cookies: string[] = [];
+  headers.forEach((value, key) => {
+    if (key.toLowerCase() === 'set-cookie') cookies.push(value);
+  });
+  return cookies;
+}
+
 const MTOP_BASE = 'https://h5api.m.1688.com/h5';
 const APP_KEY = '12574478';
 const JSV = '2.7.2';
@@ -77,29 +89,38 @@ export async function acquireToken(): Promise<MtopToken> {
   // 직접 모드: 1688에서 토큰 획득
   const cookieMap = new Map<string, string>();
 
-  // Step 1: 메인 페이지 접속
-  const res = await proxiedFetch('https://www.1688.com/', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'zh-CN,zh;q=0.9',
-    },
-    redirect: 'manual',
-  });
+  // Step 1: 메인 페이지 접속 (x5secdata 보안 쿠키 획득)
+  try {
+    const res = await proxiedFetch('https://www.1688.com/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+      },
+      redirect: 'manual',
+    });
 
-  for (const sc of (res.headers.getSetCookie?.() || [])) {
-    const match = sc.match(/^([^=]+)=([^;]*)/);
-    if (match) cookieMap.set(match[1], match[2]);
+    for (const sc of extractSetCookies(res.headers)) {
+      const match = sc.match(/^([^=]+)=([^;]*)/);
+      if (match) cookieMap.set(match[1], match[2]);
+    }
+  } catch {
+    // Step 1 실패해도 Step 2 시도
   }
 
   let token = '';
   const h5tk = cookieMap.get('_m_h5_tk');
   if (h5tk) {
-    token = decodeURIComponent(h5tk.trim().split('_')[0] || '');
+    token = decodeURIComponent(h5tk.trim()).split('_')[0] || '';
   }
 
-  // Step 2: 토큰 없으면 mtop 호출로 재시도
+  // Step 2: MTOP 호출로 _m_h5_tk 획득 (Step 1 쿠키 포함)
   if (!token) {
+    const step1Cookies = Array.from(cookieMap.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+
     const mtopRes = await proxiedFetch(
       `${MTOP_BASE}/mtop.1688.imageservice.putimage/1.0/?jsv=${JSV}&appKey=${APP_KEY}&t=${Date.now()}&sign=undefined&api=mtop.1688.imageService.putImage&v=1.0&type=originaljson&dataType=jsonp`,
       {
@@ -109,19 +130,24 @@ export async function acquireToken(): Promise<MtopToken> {
           'Referer': 'https://s.1688.com/',
           'Origin': 'https://s.1688.com',
           'Content-Type': 'application/x-www-form-urlencoded',
+          ...(step1Cookies ? { 'Cookie': step1Cookies } : {}),
         },
         body: 'data={}',
       }
     );
 
-    for (const sc of (mtopRes.headers.getSetCookie?.() || [])) {
+    for (const sc of extractSetCookies(mtopRes.headers)) {
       const match = sc.match(/^([^=]+)=([^;]*)/);
       if (match) cookieMap.set(match[1], match[2]);
     }
 
     const h5tk2 = cookieMap.get('_m_h5_tk');
     if (h5tk2) {
-      token = decodeURIComponent(h5tk2.trim().split('_')[0] || '');
+      token = decodeURIComponent(h5tk2.trim()).split('_')[0] || '';
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[1688 acquireToken] Step2 cookies:', Array.from(cookieMap.keys()), 'token:', token ? token.substring(0, 8) + '...' : 'EMPTY');
     }
   }
 
@@ -235,6 +261,10 @@ export async function callMtop<T = unknown>(params: {
   }
 
   const result = await response.json();
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[1688 MTOP] ${api} → ret:`, result.ret, '| data keys:', Object.keys(result.data || {}));
+  }
 
   // TOKEN 오류 → 갱신 후 1회 재시도
   if (result.ret && Array.isArray(result.ret)) {

@@ -6,7 +6,7 @@
  * - 직접 모드: 서버에서 1688 API 직접 호출
  */
 
-import { callMtop, callViaProxy, getProxyUrl, proxiedFetch } from './mtop';
+import { acquireToken, callMtop, callViaProxy, getProxyUrl, proxiedFetch } from './mtop';
 
 // ─── Types ───
 
@@ -143,7 +143,9 @@ export async function searchByImage(params: {
     };
   }
 
-  // 직접 호출
+  // 직접 호출: 세션 쿠키 포함하여 봇 차단 우회
+  const { cookies } = await acquireToken();
+
   const queryParams = new URLSearchParams({
     tab: 'imageSearch',
     imageId,
@@ -162,10 +164,15 @@ export async function searchByImage(params: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'Referer': 'https://s.1688.com/',
       'Accept': '*/*',
+      'Cookie': cookies,
     },
   });
 
   const data = await res.json();
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[1688 imageSearch] status:', data.status, '| keys:', Object.keys(data.data || {}));
+  }
 
   if (data.status !== 'success' || !data.data?.data?.offerList) {
     throw new Error(`1688 image search failed: ${JSON.stringify(data.data?.code || data.status)}`);
@@ -179,6 +186,14 @@ export async function searchByImage(params: {
 }
 
 // ─── 키워드 검색 ───
+
+// 시도할 MTOP API 이름 목록 (성공 시 로그에서 확인)
+const KEYWORD_SEARCH_APIS = [
+  'mtop.1688.s.searcher.search',
+  'mtop.alibaba.seller.search.offerSearch',
+  'mtop.1688.search.s.searcher.search',
+  'mtop.1688.searchoffer.offersearch',
+];
 
 export async function searchByKeyword(params: {
   keyword: string;
@@ -212,32 +227,55 @@ export async function searchByKeyword(params: {
     };
   }
 
-  // 직접 호출
-  const queryParams = new URLSearchParams({
-    keywords: keyword,
-    beginPage: String(page),
-    pageSize: String(pageSize),
-    pageName: 'search',
-    filt: 'y',
-    tab: 'all',
-  });
-  if (sort) queryParams.set('sortType', sort);
+  // 직접 모드: MTOP API 시도 (search.1688.com/service/offerSearchService 폐기됨)
+  for (const api of KEYWORD_SEARCH_APIS) {
+    try {
+      const result = await callMtop<{
+        ret: string[];
+        data: unknown;
+      }>({
+        api,
+        version: '1.0',
+        data: {
+          keywords: keyword,
+          beginPage: page,
+          pageSize,
+          sortType: sort || '',
+          pageName: 'search',
+        },
+        method: 'POST',
+      });
 
-  const res = await proxiedFetch(`https://search.1688.com/service/offerSearchService?${queryParams}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Referer': 'https://s.1688.com/',
-      'Accept': '*/*',
-    },
-  });
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[1688 keywordSearch] api=${api} ret:`, result.ret, '| data:', JSON.stringify(result.data)?.substring(0, 200));
+      }
 
-  const data = await res.json();
+      const retStr = (result.ret || []).join(',');
+      if (retStr.includes('FAIL_SYS_API_NOT_FOUNDED') || retStr.includes('API_NOT_FOUND')) {
+        continue; // 다음 API 시도
+      }
 
-  return {
-    offerList: data.data?.data?.offerList || [],
-    totalCount: data.data?.data?.totalCount || 0,
-    pageCount: data.data?.data?.pageCount || 1,
-  };
+      // 성공 — 다양한 응답 구조 처리
+      const d = result.data as Record<string, unknown>;
+      const offerList = (
+        (d?.data as Record<string, unknown>)?.offerList ||
+        (d as Record<string, unknown>)?.offerList ||
+        []
+      ) as Ali1688SearchItem[];
+      const totalCount = Number((d?.data as Record<string, unknown>)?.totalCount || (d as Record<string, unknown>)?.totalCount || 0);
+      const pageCount = Number((d?.data as Record<string, unknown>)?.pageCount || (d as Record<string, unknown>)?.pageCount || 1);
+
+      return { offerList, totalCount, pageCount };
+    } catch {
+      // 이 API 실패 → 다음 시도
+    }
+  }
+
+  // 모든 MTOP API 실패
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('[1688 keywordSearch] 모든 MTOP API 실패. 올바른 API 이름 확인 필요.');
+  }
+  return { offerList: [], totalCount: 0, pageCount: 1 };
 }
 
 // ─── URL → base64 변환 ───
@@ -262,6 +300,14 @@ export async function imageUrlToBase64(imageUrl: string): Promise<string> {
 
 // ─── 상품 상세 ───
 
+// 시도할 MTOP API 이름 목록
+const ITEM_DETAIL_APIS = [
+  'mtop.1688.item.getItemDetail',
+  'mtop.alibaba.detail.sub.getDetailPageData',
+  'mtop.1688.pcdetail.getdetailpagedata',
+  'mtop.1688.offer.getOfferDetail',
+];
+
 export async function getItemDetail(offerId: string): Promise<Ali1688ItemDetail | null> {
   const proxyUrl = getProxyUrl();
 
@@ -278,20 +324,37 @@ export async function getItemDetail(offerId: string): Promise<Ali1688ItemDetail 
     }
   }
 
-  // 직접 모드: MTOP 비공식 API
-  try {
-    const result = await callMtop<{
-      data: { data: Ali1688ItemDetail };
-      ret: string[];
-    }>({
-      api: 'mtop.1688.modularasyncservice.executemodulearservice',
-      version: '1.0',
-      data: { offerId, language: 'ko' },
-      method: 'POST',
-    });
+  // 직접 모드: MTOP API 시도
+  for (const api of ITEM_DETAIL_APIS) {
+    try {
+      const result = await callMtop<{
+        ret: string[];
+        data: unknown;
+      }>({
+        api,
+        version: '1.0',
+        data: { offerId: Number(offerId) },
+        method: 'POST',
+      });
 
-    return result?.data?.data || null;
-  } catch {
-    return null;
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[1688 itemDetail] api=${api} ret:`, result.ret, '| data:', JSON.stringify(result.data)?.substring(0, 200));
+      }
+
+      const retStr = (result.ret || []).join(',');
+      if (retStr.includes('FAIL_SYS_API_NOT_FOUNDED') || retStr.includes('API_NOT_FOUND')) {
+        continue;
+      }
+
+      const d = result.data as Record<string, unknown>;
+      const detail = ((d?.data as unknown) || (d as unknown)) as Ali1688ItemDetail;
+      if (detail?.offerId || detail?.subject) {
+        return detail;
+      }
+    } catch {
+      // 다음 API 시도
+    }
   }
+
+  return null;
 }
