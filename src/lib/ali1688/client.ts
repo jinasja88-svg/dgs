@@ -6,7 +6,7 @@
  * - 직접 모드: 서버에서 1688 API 직접 호출
  */
 
-import { callMtop, callViaProxy, getProxyUrl } from './mtop';
+import { callMtop, callViaProxy, getProxyUrl, proxiedFetch } from './mtop';
 
 // ─── Types ───
 
@@ -157,7 +157,7 @@ export async function searchByImage(params: {
   });
   if (categoryId) queryParams.set('pailitaoCategoryId', categoryId);
 
-  const res = await fetch(`https://search.1688.com/service/imageSearchOfferResultViewService?${queryParams}`, {
+  const res = await proxiedFetch(`https://search.1688.com/service/imageSearchOfferResultViewService?${queryParams}`, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'Referer': 'https://s.1688.com/',
@@ -223,7 +223,7 @@ export async function searchByKeyword(params: {
   });
   if (sort) queryParams.set('sortType', sort);
 
-  const res = await fetch(`https://search.1688.com/service/offerSearchService?${queryParams}`, {
+  const res = await proxiedFetch(`https://search.1688.com/service/offerSearchService?${queryParams}`, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'Referer': 'https://s.1688.com/',
@@ -263,6 +263,22 @@ export async function imageUrlToBase64(imageUrl: string): Promise<string> {
 // ─── 상품 상세 ───
 
 export async function getItemDetail(offerId: string): Promise<Ali1688ItemDetail | null> {
+  const proxyUrl = getProxyUrl();
+
+  if (proxyUrl) {
+    try {
+      const result = await callViaProxy<{ data: { data: Ali1688ItemDetail } }>(
+        proxyUrl,
+        `/product/${offerId}`,
+        { method: 'GET' }
+      );
+      return result?.data?.data || null;
+    } catch {
+      return null;
+    }
+  }
+
+  // 직접 모드: MTOP 비공식 API
   try {
     const result = await callMtop<{
       data: { data: Ali1688ItemDetail };

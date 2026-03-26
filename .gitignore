@@ -44,6 +44,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Plans (Claude Code)
+.plans/
+
 # IDE
 .idea/
 .vscode/
