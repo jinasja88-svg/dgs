@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingBag, Users } from 'lucide-react';
+import { Activity, LayoutDashboard, Package, ShoppingBag, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 
@@ -11,6 +11,7 @@ const adminNavItems = [
   { label: '소싱 주문', href: '/admin/sourcing-orders', icon: Package },
   { label: '일반 주문', href: '/admin/orders', icon: ShoppingBag },
   { label: '사용자', href: '/admin/users', icon: Users },
+  { label: 'API 모니터', href: '/admin/api-monitor', icon: Activity },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

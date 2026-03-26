@@ -1,15 +1,28 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, ImagePlus, Filter, X, Upload } from 'lucide-react';
+import { Search, ImagePlus, Filter, X, Upload, Clock, Zap } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { createClient } from '@/lib/supabase';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import Pagination from '@/components/ui/Pagination';
 import { formatPrice } from '@/lib/utils';
 import type { SourcingProduct, SourcingCategory, PaginatedResponse } from '@/types';
+
+const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
+const MAX_RECENT = 8;
+
+function saveRecentSearch(keyword: string) {
+  if (!keyword.trim()) return;
+  try {
+    const prev: string[] = JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]');
+    const next = [keyword, ...prev.filter((k) => k !== keyword)].slice(0, MAX_RECENT);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+  } catch {}
+}
 
 export default function ShopPage() {
   const [keyword, setKeyword] = useState('');
@@ -21,7 +34,29 @@ export default function ShopPage() {
   const [isImageSearching, setIsImageSearching] = useState(false);
   const [imageResults, setImageResults] = useState<SourcingProduct[] | null>(null);
   const [similarSearchSource, setSimilarSearchSource] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [userName, setUserName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 최근 검색어 & 사용자명 로드
+  useEffect(() => {
+    try {
+      setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
+    } catch {}
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', data.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile?.name) setUserName(profile.name);
+          });
+      }
+    });
+  }, []);
 
   const { data: categories } = useQuery<SourcingCategory[]>({
     queryKey: ['sourcing-categories'],
@@ -45,6 +80,38 @@ export default function ShopPage() {
     setImageResults(null);
     setSimilarSearchSource(null);
     setKeyword(searchInput);
+    setPage(1);
+    if (searchInput.trim()) {
+      saveRecentSearch(searchInput.trim());
+      setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
+    }
+  };
+
+  const handleRecentClick = (term: string) => {
+    setSearchInput(term);
+    setImageResults(null);
+    setSimilarSearchSource(null);
+    setKeyword(term);
+    setPage(1);
+  };
+
+  const removeRecent = (term: string) => {
+    const next = recentSearches.filter((k) => k !== term);
+    setRecentSearches(next);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+  };
+
+  const clearAllRecent = () => {
+    setRecentSearches([]);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  };
+
+  const handleCategoryClick = (catName: string) => {
+    setSelectedCategory(catName);
+    setImageResults(null);
+    setSimilarSearchSource(null);
+    setKeyword('');
+    setSearchInput('');
     setPage(1);
   };
 
@@ -130,8 +197,25 @@ export default function ShopPage() {
   const displayProducts = imageResults || result?.data || [];
   const showPagination = !imageResults && result && result.total_pages > 1;
 
+  const hasResults = !!(keyword || selectedCategory || imageResults);
+
   return (
     <div className="p-6 lg:p-8">
+      {/* 환영 배너 */}
+      {!hasResults && (
+        <div className="bg-primary-5 border border-primary/20 rounded-[var(--radius-lg)] px-6 py-5 mb-6 flex items-center gap-4">
+          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Zap className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-primary">
+              {userName ? `${userName}님, 오늘도 소싱 시작해볼까요?` : '1688 소싱, 딸깍 한 번으로'}
+            </p>
+            <p className="text-sm text-primary/70 mt-0.5">키워드 또는 이미지로 중국 도매 상품을 검색하세요</p>
+          </div>
+        </div>
+      )}
+
       {/* Page Title */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">아이템 검색</h1>
@@ -228,6 +312,53 @@ export default function ShopPage() {
           </div>
         )}
       </div>
+
+      {/* 인기 카테고리 빠른 진입 */}
+      {!hasResults && categories && categories.length > 0 && (
+        <div className="mb-6">
+          <p className="text-xs font-medium text-text-tertiary mb-2 flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5" /> 인기 카테고리
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => handleCategoryClick(cat.name)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-full text-xs font-medium text-text-secondary hover:bg-primary-5 hover:border-primary hover:text-primary transition-colors"
+              >
+                <span>{cat.icon}</span>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 최근 검색어 */}
+      {!hasResults && recentSearches.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-text-tertiary flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" /> 최근 검색어
+            </p>
+            <button onClick={clearAllRecent} className="text-xs text-text-tertiary hover:text-danger transition-colors">
+              전체 삭제
+            </button>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {recentSearches.map((term) => (
+              <span key={term} className="flex items-center gap-1 pl-3 pr-1.5 py-1 bg-white border border-border rounded-full text-xs text-text-secondary">
+                <button onClick={() => handleRecentClick(term)} className="hover:text-primary transition-colors">
+                  {term}
+                </button>
+                <button onClick={() => removeRecent(term)} className="w-4 h-4 flex items-center justify-center hover:text-danger transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Similar Search Source Banner */}
       {similarSearchSource && imageResults && (
