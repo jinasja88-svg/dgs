@@ -6,6 +6,8 @@ import {
   mapSearchItemToProduct,
 } from '@/lib/ali1688';
 import { getExchangeRate } from '@/lib/exchange-rate';
+import { logApiCall } from '@/lib/api-logger';
+import { translateProducts } from '@/lib/translation';
 
 export async function POST(request: NextRequest) {
   let body: { image_url?: string; page?: number };
@@ -26,21 +28,16 @@ export async function POST(request: NextRequest) {
     // 이미지를 base64로 변환
     const base64 = await imageUrlToBase64(image_url);
 
-    // Step 1: 이미지 업로드 → imageId 획득
-    const { imageId, sessionId, requestId } = await uploadImage(base64);
-
-    // Step 2: 유사 상품 검색
-    const result = await searchByImage({
-      imageId,
-      sessionId,
-      requestId,
-      page,
-      pageSize: 40,
+    // Step 1: 이미지 업로드 → imageId 획득 / Step 2: 유사 상품 검색
+    const result = await logApiCall('image-search', async () => {
+      const { imageId, sessionId, requestId } = await uploadImage(base64);
+      return searchByImage({ imageId, sessionId, requestId, page, pageSize: 40 });
     });
 
-    const products = result.offerList.map((item) =>
+    const rawProducts = result.offerList.map((item) =>
       mapSearchItemToProduct(item, exchangeRate)
     );
+    const products = await translateProducts(rawProducts);
 
     return NextResponse.json({
       data: products,

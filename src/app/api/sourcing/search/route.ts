@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { searchByKeyword, mapSearchItemToProduct } from '@/lib/ali1688';
 import { getExchangeRate } from '@/lib/exchange-rate';
+import { logApiCall } from '@/lib/api-logger';
+import { translateProducts, translateSearchQuery } from '@/lib/translation';
 
 const CATEGORY_KEYWORD_MAP: Record<string, string> = {
   '의류/패션': '服装',
@@ -22,11 +24,11 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1');
   const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 40);
 
-  // 검색 키워드 조합
-  let searchKeyword = keyword;
+  // 검색 키워드 조합 (한국어 키워드는 중국어로 번역)
+  let searchKeyword = await translateSearchQuery(keyword);
   if (category && CATEGORY_KEYWORD_MAP[category]) {
     const catKeyword = CATEGORY_KEYWORD_MAP[category];
-    searchKeyword = keyword ? `${keyword} ${catKeyword}` : catKeyword;
+    searchKeyword = searchKeyword ? `${searchKeyword} ${catKeyword}` : catKeyword;
   }
   if (!searchKeyword) {
     searchKeyword = '热销产品';
@@ -35,13 +37,11 @@ export async function GET(request: NextRequest) {
   try {
     const exchangeRate = await getExchangeRate();
 
-    const result = await searchByKeyword({
-      keyword: searchKeyword,
-      page,
-      pageSize: perPage,
-    });
+    const result = await logApiCall('search', () =>
+      searchByKeyword({ keyword: searchKeyword, page, pageSize: perPage })
+    );
 
-    const products = result.offerList.map((item) =>
+    let products = result.offerList.map((item) =>
       mapSearchItemToProduct(item, exchangeRate)
     );
 
@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
         p.category = category;
       }
     }
+
+    products = await translateProducts(products);
 
     return NextResponse.json({
       data: products,
