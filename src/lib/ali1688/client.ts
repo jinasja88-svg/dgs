@@ -196,13 +196,16 @@ interface TppOfferItem {
   data: {
     offerId: string;
     title: string;
-    price?: { price: string };
+    priceInfo?: { price: string; priceType?: string };
     offerPicUrl?: string;
+    odPicUrl?: string;
     linkUrl?: string;
-    isP4P?: string;
-    isAd?: string;
+    isP4P?: string | boolean;
+    isAd?: string | boolean;
     company?: { name: string };
     tradeQuantity?: { value: number };
+    afterPrice?: { text: string };
+    loginId?: string;
   };
 }
 
@@ -274,16 +277,12 @@ export async function searchByKeyword(params: {
     method: 'POST',
   });
 
+  const offerData = result?.data?.data?.OFFER;
+
   if (process.env.NODE_ENV === 'development') {
-    console.log('[1688 keywordSearch] ret:', result.ret, '| code:', result?.data?.code);
-    const rawItems = result?.data?.data?.OFFER?.items;
-    if (rawItems && rawItems.length > 0) {
-      console.log('[1688 keywordSearch] first item keys:', Object.keys(rawItems[0]));
-      console.log('[1688 keywordSearch] first item sample:', JSON.stringify(rawItems[0]).substring(0, 500));
-    }
+    console.log('[1688 keywordSearch] ret:', result.ret, '| code:', result?.data?.code, '| items:', offerData?.items?.length ?? 0);
   }
 
-  const offerData = result?.data?.data?.OFFER;
   if (!offerData?.items) {
     return { offerList: [], totalCount: 0, pageCount: 1 };
   }
@@ -296,9 +295,13 @@ export async function searchByKeyword(params: {
     .map((item) => ({
       offerId: Number(item.data.offerId),
       subject: item.data.title || '',
-      image: { imgUrl: item.data.offerPicUrl || '' },
-      priceInfo: item.data.price ? { price: item.data.price.price } : undefined,
-      company: item.data.company ? { name: item.data.company.name } : undefined,
+      image: { imgUrl: item.data.offerPicUrl || item.data.odPicUrl || '' },
+      priceInfo: item.data.priceInfo ? { price: item.data.priceInfo.price } : undefined,
+      company: item.data.company
+        ? { name: item.data.company.name }
+        : item.data.loginId
+          ? { name: item.data.loginId }
+          : undefined,
     }));
 
   return { offerList, totalCount, pageCount };
