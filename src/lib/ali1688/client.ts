@@ -187,13 +187,24 @@ export async function searchByImage(params: {
 
 // ─── 키워드 검색 ───
 
-// 시도할 MTOP API 이름 목록 (성공 시 로그에서 확인)
-const KEYWORD_SEARCH_APIS = [
-  'mtop.1688.s.searcher.search',
-  'mtop.alibaba.seller.search.offerSearch',
-  'mtop.1688.search.s.searcher.search',
-  'mtop.1688.searchoffer.offersearch',
-];
+// 1688 검색 페이지의 TPP(Taobao Page Platform) ID
+const SEARCH_TPPID = 32517;
+const SEARCH_PAGE_ID = 'GhwpBrPKR5OMydkWKGhf24pD5weFsBOg9FLvtQU9uOShVA43';
+
+interface TppOfferItem {
+  cellType: string;
+  data: {
+    offerId: string;
+    title: string;
+    price?: { price: string };
+    offerPicUrl?: string;
+    linkUrl?: string;
+    isP4P?: string;
+    isAd?: string;
+    company?: { name: string };
+    tradeQuantity?: { value: number };
+  };
+}
 
 export async function searchByKeyword(params: {
   keyword: string;
@@ -227,55 +238,70 @@ export async function searchByKeyword(params: {
     };
   }
 
-  // 직접 모드: MTOP API 시도 (search.1688.com/service/offerSearchService 폐기됨)
-  for (const api of KEYWORD_SEARCH_APIS) {
-    try {
-      const result = await callMtop<{
-        ret: string[];
-        data: unknown;
-      }>({
-        api,
-        version: '1.0',
-        data: {
-          keywords: keyword,
-          beginPage: page,
-          pageSize,
-          sortType: sort || '',
-          pageName: 'search',
-        },
-        method: 'POST',
-      });
+  // 직접 모드: TPP 검색 API (mtop.relationrecommend.WirelessRecommend.recommend v2.0)
+  const tppParams: Record<string, unknown> = {
+    method: 'getOfferList',
+    keywords: keyword,
+    pageId: SEARCH_PAGE_ID,
+    verticalProductFlag: 'pcmarket',
+    searchScene: 'pcOfferSearch',
+    charset: 'GBK',
+    beginPage: page,
+    pageSize,
+  };
+  if (sort) tppParams.sortType = sort;
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[1688 keywordSearch] api=${api} ret:`, result.ret, '| data:', JSON.stringify(result.data)?.substring(0, 200));
-      }
+  const result = await callMtop<{
+    ret: string[];
+    data: {
+      result: unknown[];
+      code: string;
+      data: {
+        OFFER?: {
+          found: string;
+          hasMore: string;
+          items: TppOfferItem[];
+        };
+      };
+    };
+  }>({
+    api: 'mtop.relationrecommend.WirelessRecommend.recommend',
+    version: '2.0',
+    data: {
+      appId: SEARCH_TPPID,
+      params: JSON.stringify(tppParams),
+    },
+    method: 'POST',
+  });
 
-      const retStr = (result.ret || []).join(',');
-      if (retStr.includes('FAIL_SYS_API_NOT_FOUNDED') || retStr.includes('API_NOT_FOUND')) {
-        continue; // 다음 API 시도
-      }
-
-      // 성공 — 다양한 응답 구조 처리
-      const d = result.data as Record<string, unknown>;
-      const offerList = (
-        (d?.data as Record<string, unknown>)?.offerList ||
-        (d as Record<string, unknown>)?.offerList ||
-        []
-      ) as Ali1688SearchItem[];
-      const totalCount = Number((d?.data as Record<string, unknown>)?.totalCount || (d as Record<string, unknown>)?.totalCount || 0);
-      const pageCount = Number((d?.data as Record<string, unknown>)?.pageCount || (d as Record<string, unknown>)?.pageCount || 1);
-
-      return { offerList, totalCount, pageCount };
-    } catch {
-      // 이 API 실패 → 다음 시도
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[1688 keywordSearch] ret:', result.ret, '| code:', result?.data?.code);
+    const rawItems = result?.data?.data?.OFFER?.items;
+    if (rawItems && rawItems.length > 0) {
+      console.log('[1688 keywordSearch] first item keys:', Object.keys(rawItems[0]));
+      console.log('[1688 keywordSearch] first item sample:', JSON.stringify(rawItems[0]).substring(0, 500));
     }
   }
 
-  // 모든 MTOP API 실패
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('[1688 keywordSearch] 모든 MTOP API 실패. 올바른 API 이름 확인 필요.');
+  const offerData = result?.data?.data?.OFFER;
+  if (!offerData?.items) {
+    return { offerList: [], totalCount: 0, pageCount: 1 };
   }
-  return { offerList: [], totalCount: 0, pageCount: 1 };
+
+  const totalCount = Number(offerData.found) || 0;
+  const pageCount = Math.ceil(totalCount / pageSize) || 1;
+
+  const offerList: Ali1688SearchItem[] = offerData.items
+    .filter((item) => item?.data?.offerId)
+    .map((item) => ({
+      offerId: Number(item.data.offerId),
+      subject: item.data.title || '',
+      image: { imgUrl: item.data.offerPicUrl || '' },
+      priceInfo: item.data.price ? { price: item.data.price.price } : undefined,
+      company: item.data.company ? { name: item.data.company.name } : undefined,
+    }));
+
+  return { offerList, totalCount, pageCount };
 }
 
 // ─── URL → base64 변환 ───
