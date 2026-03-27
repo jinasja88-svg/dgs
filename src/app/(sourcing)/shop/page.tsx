@@ -447,7 +447,7 @@ export default function ShopPage() {
                   key={product.product_id}
                   className="group relative bg-white border border-border-light rounded-[var(--radius-lg)] overflow-hidden hover:shadow-card-hover transition-all duration-200"
                 >
-                  <Link href={`/shop/${product.product_id}`}>
+                  <Link href={`/shop/${product.product_id}?title=${encodeURIComponent(product.title)}&image=${encodeURIComponent(product.images[0]||'')}&price_krw=${product.price_krw}&price_cny=${product.price_cny}&seller=${encodeURIComponent(product.seller?.name||'')}`}>
                     <div className="aspect-square bg-surface flex items-center justify-center overflow-hidden relative">
                       {product.images[0] ? (
                         <img
@@ -477,7 +477,7 @@ export default function ShopPage() {
                     </button>
                   )}
 
-                  <Link href={`/shop/${product.product_id}`}>
+                  <Link href={`/shop/${product.product_id}?title=${encodeURIComponent(product.title)}&image=${encodeURIComponent(product.images[0]||'')}&price_krw=${product.price_krw}&price_cny=${product.price_cny}&seller=${encodeURIComponent(product.seller?.name||'')}`}>
                     <div className="p-3">
                       <h3 className="text-sm font-medium text-text-primary line-clamp-2 mb-1 group-hover:text-primary transition-colors">
                         {product.title}

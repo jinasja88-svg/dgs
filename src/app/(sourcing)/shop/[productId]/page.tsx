@@ -2,8 +2,8 @@
 
 import { useState, use, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { Minus, Plus, ShoppingCart, ArrowLeft, Heart } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -16,16 +16,54 @@ const WISHLIST_KEY = 'ddalkkak-wishlist';
 export default function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isOrdering, setIsOrdering] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const { data: product, isLoading } = useQuery<SourcingProduct>({
+  // URL 파라미터에서 검색 결과 기본 정보 추출 (상세 API 실패 시 폴백)
+  const fallbackProduct: SourcingProduct | null = (() => {
+    const title = searchParams.get('title');
+    const image = searchParams.get('image');
+    const price_krw = searchParams.get('price_krw');
+    const price_cny = searchParams.get('price_cny');
+    const seller = searchParams.get('seller');
+    if (!title) return null;
+    return {
+      product_id: productId,
+      title,
+      title_zh: title,
+      price_krw: Number(price_krw) || 0,
+      price_cny: Number(price_cny) || 0,
+      images: image ? [decodeURIComponent(image)] : [],
+      skus: [],
+      seller: seller ? { name: decodeURIComponent(seller) } : null,
+      stock: 0,
+    };
+  })();
+
+  const { data: product, isLoading, error } = useQuery<SourcingProduct>({
     queryKey: ['sourcing-product', productId],
-    queryFn: () => fetch(`/api/sourcing/product/${productId}`).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`/api/sourcing/product/${productId}`);
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error || '상품을 불러오지 못했습니다');
+      return json;
+    },
+    retry: false,
   });
+
+  // 상세 API 실패 시 검색 결과 fallback 사용 (hooks 이후, 조건부 렌더링 이전에 선언)
+  const displayProduct = product || (error && fallbackProduct) || null;
+
+  const selectedSkuData = displayProduct?.skus?.find((s) => s.sku_id === selectedSku);
+  const currentPrice = selectedSkuData?.price_krw || displayProduct?.price_krw || 0;
+  const currentPriceCny = selectedSkuData?.price_cny || displayProduct?.price_cny || 0;
+  const serviceFee = Math.round(currentPrice * quantity * 0.12);
+  const shippingFee = 3000;
+  const totalPrice = currentPrice * quantity + serviceFee + shippingFee;
 
   useEffect(() => {
     try {
@@ -35,7 +73,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   }, [productId]);
 
   const toggleWishlist = () => {
-    if (!product) return;
+    if (!displayProduct) return;
     try {
       const wishlist = JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]');
       if (isWishlisted) {
@@ -45,13 +83,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         toast.success('찜목록에서 제거했습니다');
       } else {
         wishlist.push({
-          product_id: product.product_id,
-          title: product.title,
-          title_zh: product.title_zh,
-          image: product.images[0] || '',
-          price_krw: product.price_krw,
-          price_cny: product.price_cny,
-          seller_name: product.seller?.name,
+          product_id: displayProduct.product_id,
+          title: displayProduct.title,
+          title_zh: displayProduct.title_zh,
+          image: displayProduct.images[0] || '',
+          price_krw: displayProduct.price_krw,
+          price_cny: displayProduct.price_cny,
+          seller_name: displayProduct.seller?.name,
           added_at: new Date().toISOString(),
         });
         localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
@@ -61,15 +99,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     } catch {}
   };
 
-  const selectedSkuData = product?.skus.find((s) => s.sku_id === selectedSku);
-  const currentPrice = selectedSkuData?.price_krw || product?.price_krw || 0;
-  const currentPriceCny = selectedSkuData?.price_cny || product?.price_cny || 0;
-  const serviceFee = Math.round(currentPrice * quantity * 0.12);
-  const shippingFee = 3000;
-  const totalPrice = currentPrice * quantity + serviceFee + shippingFee;
-
   const handleOrder = async () => {
-    if (product?.skus.length && !selectedSku) {
+    if (displayProduct?.skus?.length && !selectedSku) {
       toast.error('옵션을 선택해주세요.');
       return;
     }
@@ -82,9 +113,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         body: JSON.stringify({
           items: [
             {
-              product_id: product!.product_id,
-              title: product!.title,
-              image: product!.images[0] || '',
+              product_id: displayProduct!.product_id,
+              title: displayProduct!.title,
+              image: displayProduct!.images[0] || '',
               sku_name: selectedSkuData?.name,
               quantity,
               price_cny: currentPriceCny,
@@ -112,7 +143,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     }
   };
 
-  if (isLoading) {
+  if (!isLoading && !displayProduct) {
+    return (
+      <div className="p-6 lg:p-8 text-center py-20">
+        <p className="text-text-tertiary mb-4">상품 정보를 불러올 수 없습니다.</p>
+        <div className="flex gap-3 justify-center">
+          <Link href="/shop" className="text-primary hover:underline">목록으로 돌아가기</Link>
+          <a
+            href={`https://detail.1688.com/offer/${productId}.html`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline inline-flex items-center gap-1"
+          >
+            1688에서 보기 <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading && !fallbackProduct) {
     return (
       <div className="p-6 lg:p-8">
         <div className="grid md:grid-cols-2 gap-8">
@@ -127,17 +177,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     );
   }
 
-  if (!product || 'error' in product) {
-    return (
-      <div className="p-6 lg:p-8 text-center py-20">
-        <p className="text-text-tertiary mb-4">상품을 찾을 수 없습니다.</p>
-        <Link href="/shop" className="text-primary hover:underline">
-          목록으로 돌아가기
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 lg:p-8">
       <Link href="/shop" className="inline-flex items-center gap-1 text-sm text-text-tertiary hover:text-primary mb-6 transition-colors">
@@ -148,19 +187,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         {/* Image Gallery */}
         <div>
           <div className="aspect-square bg-white rounded-[var(--radius-lg)] overflow-hidden flex items-center justify-center border border-border-light">
-            {product.images[selectedImageIndex] ? (
+            {displayProduct!.images[selectedImageIndex] ? (
               <img
-                src={product.images[selectedImageIndex]}
-                alt={product.title}
+                src={displayProduct!.images[selectedImageIndex]}
+                alt={displayProduct!.title}
                 className="w-full h-full object-cover"
               />
             ) : (
               <span className="text-6xl">📦</span>
             )}
           </div>
-          {product.images.length > 1 && (
+          {displayProduct!.images.length > 1 && (
             <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-              {product.images.map((img, i) => (
+              {displayProduct!.images.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setSelectedImageIndex(i)}
@@ -178,9 +217,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         {/* Info */}
         <div>
           <div className="bg-white rounded-[var(--radius-lg)] border border-border-light p-6">
-            <h1 className="text-xl font-bold text-text-primary mb-1">{product.title}</h1>
-            {product.title_zh && (
-              <p className="text-sm text-text-tertiary mb-4">{product.title_zh}</p>
+            <h1 className="text-xl font-bold text-text-primary mb-1">{displayProduct!.title}</h1>
+            {displayProduct!.title_zh && (
+              <p className="text-sm text-text-tertiary mb-4">{displayProduct!.title_zh}</p>
             )}
 
             <div className="flex items-baseline gap-3 mb-6">
@@ -188,21 +227,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               <span className="text-sm text-text-tertiary">¥{currentPriceCny}</span>
             </div>
 
-            {product.seller && (
+            {displayProduct!.seller && (
               <div className="flex items-center gap-4 p-3 bg-surface rounded-[var(--radius-md)] mb-6 text-sm">
-                <span className="font-medium">{product.seller.name}</span>
-                <span className="text-warning">★ {product.seller.rating}</span>
-                {product.seller.years && <span className="text-text-tertiary">{product.seller.years}년</span>}
-                {product.seller.location && <span className="text-text-tertiary">{product.seller.location}</span>}
+                <span className="font-medium">{displayProduct!.seller.name}</span>
+                <span className="text-warning">★ {displayProduct!.seller.rating}</span>
+                {displayProduct!.seller.years && <span className="text-text-tertiary">{displayProduct!.seller.years}년</span>}
+                {displayProduct!.seller.location && <span className="text-text-tertiary">{displayProduct!.seller.location}</span>}
               </div>
             )}
 
             {/* SKU Selection */}
-            {product.skus.length > 0 && (
+            {displayProduct!.skus?.length > 0 && (
               <div className="mb-6">
                 <label className="text-sm font-medium text-text-primary mb-2 block">옵션 선택</label>
                 <div className="flex flex-wrap gap-2">
-                  {product.skus.map((sku) => (
+                  {displayProduct!.skus?.map((sku) => (
                     <button
                       key={sku.sku_id}
                       onClick={() => setSelectedSku(sku.sku_id)}
@@ -225,7 +264,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               <label className="text-sm font-medium text-text-primary mb-2 block">수량</label>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setQuantity(Math.max(product.min_order || 1, quantity - 1))}
+                  onClick={() => setQuantity(Math.max(displayProduct!.min_order || 1, quantity - 1))}
                   className="w-9 h-9 flex items-center justify-center border border-border rounded-[var(--radius-sm)] hover:bg-surface"
                 >
                   <Minus className="w-4 h-4" />
@@ -237,8 +276,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 >
                   <Plus className="w-4 h-4" />
                 </button>
-                {product.min_order && product.min_order > 1 && (
-                  <span className="text-xs text-text-tertiary">최소 주문: {product.min_order}개</span>
+                {displayProduct!.min_order && displayProduct!.min_order > 1 && (
+                  <span className="text-xs text-text-tertiary">최소 주문: {displayProduct!.min_order}개</span>
                 )}
               </div>
             </div>

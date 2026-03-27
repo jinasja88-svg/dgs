@@ -327,16 +327,12 @@ export async function imageUrlToBase64(imageUrl: string): Promise<string> {
   return `data:${contentType};base64,${base64}`;
 }
 
-// ─── 상품 상세 ───
+// ─── 상품 상세 (HTML 스크래핑) ───
 
-// 시도할 MTOP API 이름 목록
-const ITEM_DETAIL_APIS = [
-  'mtop.1688.item.getItemDetail',
-  'mtop.alibaba.detail.sub.getDetailPageData',
-  'mtop.1688.pcdetail.getdetailpagedata',
-  'mtop.1688.offer.getOfferDetail',
-];
-
+/**
+ * 1688 상품 상세 페이지 HTML에서 window.context JSON을 파싱하여 상품 정보를 반환.
+ * 한국 IP에서도 detail.1688.com은 접근 가능하며 HTML 내 JSON에 상품 데이터가 내장됨.
+ */
 export async function getItemDetail(offerId: string): Promise<Ali1688ItemDetail | null> {
   const proxyUrl = getProxyUrl();
 
@@ -353,37 +349,96 @@ export async function getItemDetail(offerId: string): Promise<Ali1688ItemDetail 
     }
   }
 
-  // 직접 모드: MTOP API 시도
-  for (const api of ITEM_DETAIL_APIS) {
+  // 직접 모드: detail.1688.com HTML 스크래핑
+  try {
+    const res = await proxiedFetch(`https://detail.1688.com/offer/${offerId}.html`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+      },
+    });
+
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    // window.context= 에서 JSON 추출
+    const contextMatch = html.match(/window\.context\s*=\s*(\{[\s\S]+?);\s*(?:window\.|<\/script>)/);
+    if (!contextMatch) return null;
+
+    let ctx: Record<string, unknown>;
     try {
-      const result = await callMtop<{
-        ret: string[];
-        data: unknown;
-      }>({
-        api,
-        version: '1.0',
-        data: { offerId: Number(offerId) },
-        method: 'POST',
-      });
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[1688 itemDetail] api=${api} ret:`, result.ret, '| data:', JSON.stringify(result.data)?.substring(0, 200));
-      }
-
-      const retStr = (result.ret || []).join(',');
-      if (retStr.includes('FAIL_SYS_API_NOT_FOUNDED') || retStr.includes('API_NOT_FOUND')) {
-        continue;
-      }
-
-      const d = result.data as Record<string, unknown>;
-      const detail = ((d?.data as unknown) || (d as unknown)) as Ali1688ItemDetail;
-      if (detail?.offerId || detail?.subject) {
-        return detail;
-      }
+      ctx = JSON.parse(contextMatch[1]);
     } catch {
-      // 다음 API 시도
+      return null;
     }
-  }
 
-  return null;
+    // 상품 기본 정보
+    const offerBaseInfo = extractNested(ctx, ['result', 'data', 'offerBaseInfo']) as Record<string, unknown> | null;
+    const skuInfo = extractNested(ctx, ['result', 'data', 'skuInfoMap']) as Record<string, unknown> | null;
+    const priceRanges = extractNested(ctx, ['result', 'data', 'priceRangeList']) as Array<{ startQuantity: number; price: number }> | null;
+    const sellerInfo = extractNested(ctx, ['result', 'data', 'sellerMemberId']) as string | null;
+    const companyInfo = extractNested(ctx, ['result', 'data', 'sellerLoginId']) as string | null;
+
+    // 이미지 추출
+    const imageList = extractNested(ctx, ['result', 'data', 'offerImageList']) as Array<{ imageUrl?: string }> | null;
+    const images: string[] = (imageList || [])
+      .map((img) => img?.imageUrl || '')
+      .filter(Boolean)
+      .map((url) => url.startsWith('//') ? `https:${url}` : url);
+
+    // 주제 (상품명)
+    const subject = (
+      extractNested(ctx, ['result', 'data', 'subject']) ||
+      html.match(/"subject":"([^"]+)"/)?.[1] ||
+      ''
+    ) as string;
+
+    // SKU 정보
+    const skuMap = skuInfo as Record<string, { specList?: Array<{ name: string; value: string }>; price?: number; canBookCount?: number; imageUrl?: string }> | null;
+    const skuInfos = skuMap
+      ? Object.entries(skuMap).map(([skuId, sku]) => ({
+          skuId: Number(skuId),
+          specAttrs: (sku.specList || []).map((s) => ({ name: s.name, value: s.value })),
+          price: String(sku.price || 0),
+          amountOnSale: sku.canBookCount || 0,
+          imageUrl: sku.imageUrl,
+        }))
+      : [];
+
+    // 가격
+    const priceInfo = priceRanges?.map((r) => ({
+      beginAmount: r.startQuantity || 1,
+      price: String(r.price || 0),
+    })) || [];
+
+    const offerId_num = Number(offerId);
+
+    if (!subject) return null;
+
+    return {
+      offerId: offerId_num,
+      subject,
+      images,
+      skuInfos,
+      priceInfo: priceInfo.length ? priceInfo : undefined,
+      sellerInfo: (companyInfo || sellerInfo)
+        ? { loginId: String(companyInfo || ''), companyName: String(companyInfo || sellerInfo || ''), sellerLevel: '', yearOfBegin: 0 }
+        : undefined,
+    };
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[1688 itemDetail] scrape error:', err);
+    }
+    return null;
+  }
+}
+
+function extractNested(obj: unknown, keys: string[]): unknown {
+  let cur = obj;
+  for (const key of keys) {
+    if (!cur || typeof cur !== 'object') return null;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur ?? null;
 }
