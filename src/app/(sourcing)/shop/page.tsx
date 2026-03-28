@@ -78,6 +78,7 @@ export default function ShopPage() {
       if (keyword) params.set('keyword', keyword);
       if (selectedCategory) params.set('category', selectedCategory);
       params.set('page', String(page));
+      params.set('per_page', '50');
       return fetch(`/api/sourcing/search?${params}`).then((r) => r.json());
     },
     enabled: !imageResults,

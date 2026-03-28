@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const keyword = searchParams.get('keyword') || '';
   const category = searchParams.get('category') || '';
   const page = parseInt(searchParams.get('page') || '1');
-  const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 40);
+  const perPage = Math.min(parseInt(searchParams.get('per_page') || '50'), 50);
 
   // 검색 키워드 조합 (한국어 키워드는 중국어로 번역)
   let searchKeyword = await translateSearchQuery(keyword);
