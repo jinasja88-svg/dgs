@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, use, useEffect } from 'react';
+import { useState, use, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -35,6 +35,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showDetailPage, setShowDetailPage] = useState(false);
+  const [iframeHeight, setIframeHeight] = useState(800);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // URL 파라미터에서 검색 결과 기본 정보 추출 (상세 API 실패 시 폴백)
   const fallbackProduct: SourcingProduct | null = (() => {
@@ -421,6 +424,68 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* 1688 상세 페이지 섹션 */}
+      <div className="mt-8">
+        <button
+          onClick={() => setShowDetailPage((v) => !v)}
+          className="w-full flex items-center justify-between px-6 py-4 bg-white border border-border-light rounded-[var(--radius-lg)] hover:bg-surface transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-text-primary">1688 상세 페이지</span>
+            <a
+              href={`https://detail.1688.com/offer/${productId}.html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 text-xs text-text-tertiary hover:text-primary"
+            >
+              새 탭에서 열기 <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+          {showDetailPage ? <ChevronUp className="w-5 h-5 text-text-tertiary" /> : <ChevronDown className="w-5 h-5 text-text-tertiary" />}
+        </button>
+
+        {showDetailPage && (
+          <div className="mt-2 border border-border-light rounded-[var(--radius-lg)] overflow-hidden bg-white">
+            <div className="flex items-center gap-2 px-4 py-2 bg-surface border-b border-border-light text-xs text-text-tertiary">
+              <span>detail.1688.com/offer/{productId}.html</span>
+            </div>
+            <iframe
+              ref={iframeRef}
+              src={`/api/sourcing/product-page/${productId}`}
+              style={{ width: '100%', height: `${iframeHeight}px`, border: 'none', display: 'block' }}
+              title="1688 상세 페이지"
+              onLoad={() => {
+                // 로드 완료 후 높이를 자동 조정 (같은 origin이므로 가능)
+                try {
+                  const body = iframeRef.current?.contentDocument?.body;
+                  if (body) {
+                    const h = body.scrollHeight;
+                    if (h > 400) setIframeHeight(Math.min(h + 40, 6000));
+                  }
+                } catch {
+                  // cross-origin 에러 무시
+                }
+              }}
+            />
+            <div className="flex justify-center gap-3 p-3 bg-surface border-t border-border-light">
+              <button
+                onClick={() => setIframeHeight((h) => Math.max(400, h - 400))}
+                className="text-xs text-text-tertiary hover:text-primary px-3 py-1 border border-border rounded"
+              >
+                높이 줄이기
+              </button>
+              <button
+                onClick={() => setIframeHeight((h) => h + 400)}
+                className="text-xs text-text-tertiary hover:text-primary px-3 py-1 border border-border rounded"
+              >
+                높이 늘리기
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
