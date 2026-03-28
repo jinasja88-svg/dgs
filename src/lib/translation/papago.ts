@@ -3,7 +3,8 @@
  * 환경변수: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
  */
 
-const PAPAGO_URL = 'https://openapi.naver.com/v1/papago/n2mt';
+// NCP Papago Translation API
+const PAPAGO_URL = 'https://papago.apigw.ntruss.com/nmt/v1/translation';
 
 async function translate(
   text: string,
@@ -24,8 +25,8 @@ async function translate(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Naver-Client-Id': clientId,
-        'X-Naver-Client-Secret': clientSecret,
+        'X-NCP-APIGW-API-KEY-ID': clientId,
+        'X-NCP-APIGW-API-KEY': clientSecret,
       },
       body: JSON.stringify({ source, target, text }),
     });
