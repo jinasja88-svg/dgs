@@ -23,11 +23,7 @@ export default function SourcingLayout({
     <div className="flex min-h-[calc(100vh-64px)]">
       {/* Left Sidebar */}
       <aside className="hidden md:flex flex-col w-60 border-r border-border-light bg-white flex-shrink-0">
-        <div className="px-3 py-6">
-          <h2 className="text-sm font-bold text-primary uppercase tracking-wider">딸깍소싱</h2>
-          <p className="text-xs text-text-tertiary mt-1">1688 소싱 대행</p>
-        </div>
-        <nav className="flex-1 px-3">
+        <nav className="flex-1 px-3 pt-6">
           {sidebarItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
