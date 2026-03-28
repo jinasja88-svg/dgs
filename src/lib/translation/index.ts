@@ -58,34 +58,52 @@ async function translateProperties(
   return Object.fromEntries(translatedEntries);
 }
 
-// 상품 배열 일괄 번역 (최대 동시 5개)
+// 상품 배열 일괄 번역
+// skipSkus: 검색 목록처럼 SKU가 필요 없을 때 true로 설정 → Papago 호출 대폭 감소
 export async function translateProducts(
-  products: SourcingProduct[]
+  products: SourcingProduct[],
+  options: { skipSkus?: boolean } = {}
 ): Promise<SourcingProduct[]> {
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 15;
   const results: SourcingProduct[] = [];
 
   for (let i = 0; i < products.length; i += CONCURRENCY) {
     const batch = products.slice(i, i + CONCURRENCY);
-    const translated = await Promise.all(batch.map(translateProduct));
+    const translated = await Promise.all(batch.map((p) => translateProduct(p, options.skipSkus)));
     results.push(...translated);
   }
 
   return results;
 }
 
-async function translateProduct(product: SourcingProduct): Promise<SourcingProduct> {
-  // title 번역 (title_zh는 중국어 원본 유지)
-  const titleKo = await zhToKoCached(product.title);
+async function translateProduct(product: SourcingProduct, skipSkus = false): Promise<SourcingProduct> {
+  // title + seller.location 동시에 번역
+  const sellerHasChinese = !!(product.seller?.location && containsChinese(product.seller.location));
+  const [titleKo, locationKo] = await Promise.all([
+    zhToKoCached(product.title),
+    sellerHasChinese ? zhToKoCached(product.seller!.location!) : Promise.resolve(undefined),
+  ]);
 
-  // SKU 번역
+  const translatedSeller = locationKo
+    ? { ...product.seller!, location: locationKo }
+    : product.seller;
+
+  if (skipSkus) {
+    return {
+      ...product,
+      title: titleKo,
+      title_zh: product.title_zh ?? product.title,
+      seller: translatedSeller,
+    };
+  }
+
+  // SKU 번역 (상세 페이지에서만 실행)
   const translatedSkus = await Promise.all(
     product.skus.map(async (sku) => {
       const translatedProperties = sku.properties
         ? await translateProperties(sku.properties)
         : undefined;
 
-      // name을 번역된 properties values로 재조합
       const translatedName = translatedProperties
         ? Object.values(translatedProperties).join(' / ')
         : await zhToKoCached(sku.name);
@@ -98,17 +116,10 @@ async function translateProduct(product: SourcingProduct): Promise<SourcingProdu
     })
   );
 
-  // seller.location 번역 (선택적)
-  let translatedSeller = product.seller;
-  if (product.seller?.location && containsChinese(product.seller.location)) {
-    const locationKo = await zhToKoCached(product.seller.location);
-    translatedSeller = { ...product.seller, location: locationKo };
-  }
-
   return {
     ...product,
     title: titleKo,
-    title_zh: product.title_zh ?? product.title, // 원본 중국어 보존
+    title_zh: product.title_zh ?? product.title,
     skus: translatedSkus,
     seller: translatedSeller,
   };

@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const rawProducts = result.offerList.map((item) =>
       mapSearchItemToProduct(item, exchangeRate)
     );
-    const products = await translateProducts(rawProducts);
+    const products = await translateProducts(rawProducts, { skipSkus: true });
 
     return NextResponse.json({
       data: products,

@@ -4,6 +4,9 @@ import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
 import { translateProducts, translateSearchQuery } from '@/lib/translation';
 
+// 인메모리 검색 결과 캐시 (5분 TTL)
+const searchCache = new Map<string, { data: unknown; expiresAt: number }>();
+
 const CATEGORY_KEYWORD_MAP: Record<string, string> = {
   '의류/패션': '服装',
   '전자기기': '电子产品',
@@ -34,12 +37,21 @@ export async function GET(request: NextRequest) {
     searchKeyword = '热销产品';
   }
 
-  try {
-    const exchangeRate = await getExchangeRate();
+  // 캐시 확인
+  const cacheKey = `${searchKeyword}:${page}:${perPage}`;
+  const hit = searchCache.get(cacheKey);
+  if (hit && hit.expiresAt > Date.now()) {
+    return NextResponse.json(hit.data);
+  }
 
-    const result = await logApiCall('search', () =>
-      searchByKeyword({ keyword: searchKeyword, page, pageSize: perPage })
-    );
+  try {
+    // 환율 조회 + 1688 검색 병렬 실행
+    const [exchangeRate, result] = await Promise.all([
+      getExchangeRate(),
+      logApiCall('search', () =>
+        searchByKeyword({ keyword: searchKeyword, page, pageSize: perPage })
+      ),
+    ]);
 
     let products = result.offerList.map((item) =>
       mapSearchItemToProduct(item, exchangeRate)
@@ -51,15 +63,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    products = await translateProducts(products);
+    // 검색 목록은 SKU 표시 안 하므로 title만 번역 (Papago 호출 ~90% 감소)
+    products = await translateProducts(products, { skipSkus: true });
 
-    return NextResponse.json({
+    const responseBody = {
       data: products,
       total: result.totalCount || products.length,
       page,
       per_page: perPage,
       total_pages: result.pageCount || Math.ceil((result.totalCount || products.length) / perPage),
-    });
+    };
+
+    searchCache.set(cacheKey, { data: responseBody, expiresAt: Date.now() + 5 * 60 * 1000 });
+
+    return NextResponse.json(responseBody);
   } catch (err) {
     console.error('Search error:', err);
     const message = err instanceof Error ? err.message : '상품 검색 중 오류가 발생했습니다';
