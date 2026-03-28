@@ -5,6 +5,7 @@ import { Heart, Trash2, ShoppingCart, Search } from 'lucide-react';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import { formatPrice } from '@/lib/utils';
+import { createClient } from '@/lib/supabase';
 
 interface WishlistItem {
   product_id: string;
@@ -19,7 +20,7 @@ interface WishlistItem {
 
 const WISHLIST_KEY = 'ddalkkak-wishlist';
 
-function getWishlist(): WishlistItem[] {
+function getLocalWishlist(): WishlistItem[] {
   if (typeof window === 'undefined') return [];
   try {
     return JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]');
@@ -28,28 +29,95 @@ function getWishlist(): WishlistItem[] {
   }
 }
 
-function saveWishlist(items: WishlistItem[]) {
+function saveLocalWishlist(items: WishlistItem[]) {
   localStorage.setItem(WISHLIST_KEY, JSON.stringify(items));
+}
+
+function proxyImg(url: string): string {
+  if (!url) return '';
+  if (url.includes('alicdn.com') || url.includes('1688.com/img')) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
 }
 
 export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    setItems(getWishlist());
-    setIsLoaded(true);
+    const supabase = createClient();
+
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        setItems(getLocalWishlist());
+        setIsLoggedIn(false);
+        setIsLoaded(true);
+        return;
+      }
+
+      setIsLoggedIn(true);
+
+      // DB에서 찜 목록 로드
+      const res = await fetch('/api/sourcing/wishlist');
+      const dbItems: WishlistItem[] = res.ok ? await res.json() : [];
+
+      // localStorage → DB 마이그레이션 (1회)
+      const localItems = getLocalWishlist();
+      const dbProductIds = new Set(dbItems.map((i) => i.product_id));
+      const toMigrate = localItems.filter((i) => !dbProductIds.has(i.product_id));
+
+      if (toMigrate.length > 0) {
+        await Promise.allSettled(
+          toMigrate.map((item) =>
+            fetch('/api/sourcing/wishlist', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(item),
+            })
+          )
+        );
+        localStorage.removeItem(WISHLIST_KEY);
+
+        // 마이그레이션 후 DB 재조회
+        const res2 = await fetch('/api/sourcing/wishlist');
+        const merged: WishlistItem[] = res2.ok ? await res2.json() : dbItems;
+        setItems(merged);
+      } else {
+        if (localItems.length > 0) localStorage.removeItem(WISHLIST_KEY);
+        setItems(dbItems);
+      }
+
+      setIsLoaded(true);
+    }
+
+    load();
   }, []);
 
-  const removeItem = (productId: string) => {
-    const updated = items.filter((item) => item.product_id !== productId);
-    setItems(updated);
-    saveWishlist(updated);
+  const removeItem = async (productId: string) => {
+    if (isLoggedIn) {
+      await fetch(`/api/sourcing/wishlist?product_id=${productId}`, { method: 'DELETE' });
+    } else {
+      const updated = items.filter((item) => item.product_id !== productId);
+      saveLocalWishlist(updated);
+    }
+    setItems((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
+    if (isLoggedIn) {
+      await Promise.allSettled(
+        items.map((item) =>
+          fetch(`/api/sourcing/wishlist?product_id=${item.product_id}`, { method: 'DELETE' })
+        )
+      );
+    } else {
+      saveLocalWishlist([]);
+    }
     setItems([]);
-    saveWishlist([]);
   };
 
   if (!isLoaded) {
@@ -107,7 +175,12 @@ export default function WishlistPage() {
               <Link href={`/shop/${item.product_id}`} className="flex-shrink-0">
                 <div className="w-20 h-20 bg-surface rounded-[var(--radius-md)] overflow-hidden">
                   {item.image ? (
-                    <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                    <img
+                      src={proxyImg(item.image)}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
                   )}

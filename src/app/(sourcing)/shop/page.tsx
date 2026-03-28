@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, ImagePlus, Filter, X, Upload, Clock, Zap } from 'lucide-react';
+import { Search, ImagePlus, Filter, X, Upload, Clock, Zap, History } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase';
@@ -10,6 +10,8 @@ import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import Pagination from '@/components/ui/Pagination';
 import { formatPrice } from '@/lib/utils';
+import { getRecentlyViewed } from '@/lib/recently-viewed';
+import type { RecentlyViewedItem } from '@/lib/recently-viewed';
 import type { SourcingProduct, SourcingCategory, PaginatedResponse } from '@/types';
 
 function proxyImg(url: string): string {
@@ -43,14 +45,16 @@ export default function ShopPage() {
   const [imageResults, setImageResults] = useState<SourcingProduct[] | null>(null);
   const [similarSearchSource, setSimilarSearchSource] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedItem[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 최근 검색어 & 사용자명 로드
+  // 최근 검색어 & 사용자명 & 최근 본 상품 로드
   useEffect(() => {
     try {
       setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
     } catch {}
+    setRecentlyViewed(getRecentlyViewed());
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
@@ -364,6 +368,39 @@ export default function ShopPage() {
                   <X className="w-3 h-3" />
                 </button>
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 최근 본 상품 */}
+      {!hasResults && recentlyViewed.length > 0 && (
+        <div className="mb-6">
+          <p className="text-xs font-medium text-text-tertiary mb-2 flex items-center gap-1">
+            <History className="w-3.5 h-3.5" /> 최근 본 상품
+          </p>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {recentlyViewed.map((item) => (
+              <Link
+                key={item.product_id}
+                href={`/shop/${item.product_id}`}
+                className="flex-shrink-0 w-28 group"
+              >
+                <div className="w-28 h-28 bg-white border border-border-light rounded-[var(--radius-md)] overflow-hidden mb-1.5">
+                  {item.image ? (
+                    <img
+                      src={proxyImg(item.image)}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary line-clamp-2 group-hover:text-primary transition-colors">{item.title}</p>
+                <p className="text-xs font-semibold text-primary mt-0.5">{formatPrice(item.price_krw)}</p>
+              </Link>
             ))}
           </div>
         </div>

@@ -184,6 +184,17 @@ export interface SourcingCategory {
   icon?: string;
 }
 
+export interface SourcingCartItem {
+  product_id: string;
+  title: string;
+  image: string;
+  sku_id?: string;
+  sku_name?: string;
+  quantity: number;
+  price_cny: number;
+  price_krw: number;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;

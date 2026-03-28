@@ -1,0 +1,57 @@
+import type { SourcingCartItem } from '@/types';
+
+const CART_KEY = 'ddalkkak-cart';
+const MAX_ITEMS = 50;
+
+export function getCart(): SourcingCartItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveCart(items: SourcingCartItem[]) {
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event('cart-updated'));
+}
+
+export function addToCart(item: SourcingCartItem): void {
+  const cart = getCart();
+  const key = item.product_id + (item.sku_id || '');
+  const existing = cart.find((c) => c.product_id + (c.sku_id || '') === key);
+  if (existing) {
+    existing.quantity += item.quantity;
+  } else {
+    if (cart.length >= MAX_ITEMS) cart.shift();
+    cart.push({ ...item });
+  }
+  saveCart(cart);
+}
+
+export function updateCartQty(productId: string, skuId: string | undefined, quantity: number): void {
+  const cart = getCart();
+  const key = productId + (skuId || '');
+  const item = cart.find((c) => c.product_id + (c.sku_id || '') === key);
+  if (!item) return;
+  if (quantity <= 0) {
+    removeFromCart(productId, skuId);
+    return;
+  }
+  item.quantity = quantity;
+  saveCart(cart);
+}
+
+export function removeFromCart(productId: string, skuId: string | undefined): void {
+  const key = productId + (skuId || '');
+  saveCart(getCart().filter((c) => c.product_id + (c.sku_id || '') !== key));
+}
+
+export function clearCart(): void {
+  localStorage.removeItem(CART_KEY);
+}
+
+export function getCartCount(): number {
+  return getCart().reduce((sum, item) => sum + item.quantity, 0);
+}

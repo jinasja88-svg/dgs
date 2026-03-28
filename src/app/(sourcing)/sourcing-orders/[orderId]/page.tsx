@@ -1,12 +1,15 @@
 'use client';
 
-import { use } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, Circle, Truck } from 'lucide-react';
+import { use, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, CheckCircle2, Circle, Truck, X } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Badge from '@/components/ui/Badge';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import Skeleton from '@/components/ui/Skeleton';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
 import { formatPrice, formatDate, getSourcingStatusLabel } from '@/lib/utils';
 import type { SourcingOrder, SourcingOrderStatus } from '@/types';
 
@@ -59,11 +62,33 @@ function StatusTimeline({ currentStatus }: { currentStatus: SourcingOrderStatus 
 
 export default function SourcingOrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = use(params);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const { data: order, isLoading } = useQuery<SourcingOrder>({
     queryKey: ['sourcing-order', orderId],
     queryFn: () => fetch(`/api/sourcing/orders/${orderId}`).then((r) => r.json()),
   });
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/sourcing/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      if (res.ok) {
+        await queryClient.invalidateQueries({ queryKey: ['sourcing-order', orderId] });
+        await queryClient.invalidateQueries({ queryKey: ['sourcing-orders'] });
+        setShowCancelModal(false);
+      }
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -111,6 +136,23 @@ export default function SourcingOrderDetailPage({ params }: { params: Promise<{ 
           <div className="mt-4 p-3 bg-surface rounded-[var(--radius-md)] text-sm">
             <span className="text-text-tertiary">운송장 번호: </span>
             <span className="font-medium">{order.tracking_number}</span>
+          </div>
+        )}
+        {order.status === 'pending' && (
+          <div className="mt-4 pt-4 border-t border-border-light">
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="text-sm text-danger hover:underline"
+            >
+              주문 취소
+            </button>
+          </div>
+        )}
+        {order.status !== 'pending' && order.status !== 'cancelled' && order.status !== 'delivered' && (
+          <div className="mt-4 pt-4 border-t border-border-light">
+            <p className="text-xs text-text-tertiary">
+              취소가 필요하신 경우 <a href="/contact" className="text-primary hover:underline">관리자에게 문의</a>해 주세요.
+            </p>
           </div>
         )}
       </div>
@@ -177,6 +219,35 @@ export default function SourcingOrderDetailPage({ params }: { params: Promise<{ 
           )}
         </dl>
       </div>
+
+      {/* 취소 확인 모달 */}
+      <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)} title="주문 취소">
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            주문 <span className="font-medium text-text-primary">{order.order_number}</span>을 취소하시겠습니까?
+          </p>
+          <p className="text-xs text-danger bg-danger/5 rounded-[var(--radius-md)] px-3 py-2">
+            취소 후에는 되돌릴 수 없습니다.
+          </p>
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="tertiary"
+              className="flex-1"
+              onClick={() => setShowCancelModal(false)}
+              disabled={cancelling}
+            >
+              돌아가기
+            </Button>
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="flex-1 py-2.5 px-4 rounded-[var(--radius-md)] bg-danger text-white text-sm font-medium hover:bg-danger/90 disabled:opacity-50 transition-colors"
+            >
+              {cancelling ? '취소 중...' : '주문 취소'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

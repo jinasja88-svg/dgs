@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, User, LogOut } from 'lucide-react';
+import { Menu, User, LogOut, ShoppingCart } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { getCartCount } from '@/lib/cart';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import MobileMenu from './MobileMenu';
 
@@ -12,6 +13,7 @@ export default function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const supabase = createClient();
 
   useEffect(() => {
@@ -22,6 +24,18 @@ export default function Header() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    setCartCount(getCartCount());
+    const onStorage = () => setCartCount(getCartCount());
+    window.addEventListener('storage', onStorage);
+    // 같은 탭에서 장바구니 변경 감지용 커스텀 이벤트
+    window.addEventListener('cart-updated', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('cart-updated', onStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -43,13 +57,26 @@ export default function Header() {
           isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
         )}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto pl-2 pr-4 sm:pl-3 sm:pr-6 lg:pl-4 lg:pr-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="text-xl font-bold text-primary">
               딸깍소싱
             </Link>
 
             <div className="flex items-center gap-3">
+              {/* 장바구니 아이콘 (항상 노출) */}
+              <Link
+                href="/cart"
+                className="relative p-2 text-text-secondary hover:text-primary transition-colors"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {cartCount > 9 ? '9+' : cartCount}
+                  </span>
+                )}
+              </Link>
+
               {user ? (
                 <div className="hidden md:flex items-center gap-3">
                   <Link

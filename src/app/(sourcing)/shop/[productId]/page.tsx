@@ -9,6 +9,9 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import { formatPrice, cn } from '@/lib/utils';
+import { addToCart } from '@/lib/cart';
+import { addRecentlyViewed } from '@/lib/recently-viewed';
+import { createClient } from '@/lib/supabase';
 import type { SourcingProduct } from '@/types';
 
 const WISHLIST_KEY = 'ddalkkak-wishlist';
@@ -28,8 +31,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isOrdering, setIsOrdering] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // URL 파라미터에서 검색 결과 기본 정보 추출 (상세 API 실패 시 폴백)
   const fallbackProduct: SourcingProduct | null = (() => {
@@ -74,37 +79,110 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const totalPrice = currentPrice * quantity + serviceFee + shippingFee;
 
   useEffect(() => {
-    try {
-      const wishlist = JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]');
-      setIsWishlisted(wishlist.some((item: { product_id: string }) => item.product_id === productId));
-    } catch {}
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setIsLoggedIn(true);
+        fetch('/api/sourcing/wishlist')
+          .then((r) => r.json())
+          .then((dbItems: { product_id: string }[]) => {
+            if (Array.isArray(dbItems)) {
+              setIsWishlisted(dbItems.some((i) => i.product_id === productId));
+            }
+          })
+          .catch(() => {});
+      } else {
+        setIsLoggedIn(false);
+        try {
+          const wishlist = JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]');
+          setIsWishlisted(wishlist.some((item: { product_id: string }) => item.product_id === productId));
+        } catch {}
+      }
+    });
   }, [productId]);
 
-  const toggleWishlist = () => {
+  // 상품 로드 완료 시 최근 본 상품 저장
+  useEffect(() => {
+    if (displayProduct) {
+      addRecentlyViewed({
+        product_id: displayProduct.product_id,
+        title: displayProduct.title,
+        image: displayProduct.images[0] || '',
+        price_krw: displayProduct.price_krw,
+      });
+    }
+  }, [displayProduct?.product_id]);
+
+  const toggleWishlist = async () => {
     if (!displayProduct) return;
-    try {
-      const wishlist = JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]');
+
+    if (isLoggedIn) {
       if (isWishlisted) {
-        const updated = wishlist.filter((item: { product_id: string }) => item.product_id !== productId);
-        localStorage.setItem(WISHLIST_KEY, JSON.stringify(updated));
+        await fetch(`/api/sourcing/wishlist?product_id=${productId}`, { method: 'DELETE' });
         setIsWishlisted(false);
         toast.success('찜목록에서 제거했습니다');
       } else {
-        wishlist.push({
-          product_id: displayProduct.product_id,
-          title: displayProduct.title,
-          title_zh: displayProduct.title_zh,
-          image: displayProduct.images[0] || '',
-          price_krw: displayProduct.price_krw,
-          price_cny: displayProduct.price_cny,
-          seller_name: displayProduct.seller?.name,
-          added_at: new Date().toISOString(),
+        await fetch('/api/sourcing/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product_id: displayProduct.product_id,
+            title: displayProduct.title,
+            title_zh: displayProduct.title_zh,
+            image: displayProduct.images[0] || '',
+            price_krw: displayProduct.price_krw,
+            price_cny: displayProduct.price_cny,
+            seller_name: displayProduct.seller?.name,
+          }),
         });
-        localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
         setIsWishlisted(true);
         toast.success('찜목록에 추가했습니다');
       }
-    } catch {}
+    } else {
+      try {
+        const wishlist = JSON.parse(localStorage.getItem(WISHLIST_KEY) || '[]');
+        if (isWishlisted) {
+          const updated = wishlist.filter((item: { product_id: string }) => item.product_id !== productId);
+          localStorage.setItem(WISHLIST_KEY, JSON.stringify(updated));
+          setIsWishlisted(false);
+          toast.success('찜목록에서 제거했습니다');
+        } else {
+          wishlist.push({
+            product_id: displayProduct.product_id,
+            title: displayProduct.title,
+            title_zh: displayProduct.title_zh,
+            image: displayProduct.images[0] || '',
+            price_krw: displayProduct.price_krw,
+            price_cny: displayProduct.price_cny,
+            seller_name: displayProduct.seller?.name,
+            added_at: new Date().toISOString(),
+          });
+          localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
+          setIsWishlisted(true);
+          toast.success('찜목록에 추가했습니다');
+        }
+      } catch {}
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (displayProduct?.skus?.length && !selectedSku) {
+      toast.error('옵션을 선택해주세요.');
+      return;
+    }
+    addToCart({
+      product_id: displayProduct!.product_id,
+      title: displayProduct!.title,
+      image: displayProduct!.images[0] || '',
+      sku_id: selectedSkuData?.sku_id,
+      sku_name: selectedSkuData?.name,
+      quantity,
+      price_cny: currentPriceCny,
+      price_krw: currentPrice,
+    });
+    toast.success('장바구니에 담았습니다!');
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2000);
   };
 
   const handleOrder = async () => {
@@ -311,20 +389,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2 mb-3">
               <Button
-                onClick={handleOrder}
-                isLoading={isOrdering}
+                variant="secondary"
+                onClick={handleAddToCart}
                 size="lg"
                 className="flex-1"
               >
                 <ShoppingCart className="w-5 h-5 mr-2" />
-                소싱 주문하기
+                {addedToCart ? '담겼습니다!' : '장바구니'}
               </Button>
               <button
                 onClick={toggleWishlist}
                 className={cn(
-                  'w-12 h-12 flex items-center justify-center border rounded-[var(--radius-md)] transition-colors',
+                  'w-12 h-12 flex items-center justify-center border rounded-[var(--radius-md)] transition-colors flex-shrink-0',
                   isWishlisted
                     ? 'border-danger bg-danger-5 text-danger'
                     : 'border-border text-text-tertiary hover:border-danger hover:text-danger'
@@ -333,6 +411,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 <Heart className={cn('w-5 h-5', isWishlisted && 'fill-current')} />
               </button>
             </div>
+            <Button
+              onClick={handleOrder}
+              isLoading={isOrdering}
+              size="lg"
+              className="w-full"
+            >
+              소싱 주문하기
+            </Button>
           </div>
         </div>
       </div>
