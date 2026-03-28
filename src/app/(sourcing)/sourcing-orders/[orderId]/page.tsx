@@ -2,16 +2,17 @@
 
 import { use, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, Circle, Truck, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Circle, Truck, X, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import Badge from '@/components/ui/Badge';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import Skeleton from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { formatPrice, formatDate, getSourcingStatusLabel } from '@/lib/utils';
-import type { SourcingOrder, SourcingOrderStatus } from '@/types';
+import type { SourcingOrder, SourcingOrderStatus, SourcingReview } from '@/types';
 
 const STATUS_FLOW: SourcingOrderStatus[] = ['pending', 'paid', 'purchasing', 'shipping', 'delivered'];
 
@@ -66,11 +67,44 @@ export default function SourcingOrderDetailPage({ params }: { params: Promise<{ 
   const queryClient = useQueryClient();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const { data: order, isLoading } = useQuery<SourcingOrder>({
     queryKey: ['sourcing-order', orderId],
     queryFn: () => fetch(`/api/sourcing/orders/${orderId}`).then((r) => r.json()),
   });
+
+  const { data: existingReview } = useQuery<SourcingReview | null>({
+    queryKey: ['sourcing-review', orderId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sourcing/reviews?order_id=${orderId}`);
+      const data = await r.json();
+      return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    },
+    enabled: order?.status === 'delivered',
+  });
+
+  const handleReviewSubmit = async () => {
+    if (reviewRating === 0) { toast.error('별점을 선택해주세요'); return; }
+    setIsSubmittingReview(true);
+    try {
+      const res = await fetch('/api/sourcing/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, rating: reviewRating, comment: reviewComment }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '리뷰 저장 실패');
+      toast.success('리뷰가 등록되었습니다!');
+      queryClient.invalidateQueries({ queryKey: ['sourcing-review', orderId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '오류가 발생했습니다');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -219,6 +253,65 @@ export default function SourcingOrderDetailPage({ params }: { params: Promise<{ 
           )}
         </dl>
       </div>
+
+      {/* 리뷰 섹션 (배송 완료 시) */}
+      {order.status === 'delivered' && (
+        <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6 mt-6">
+          <h2 className="text-sm font-semibold mb-4">소싱 후기</h2>
+          {existingReview ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star
+                    key={s}
+                    className={`w-5 h-5 ${s <= existingReview.rating ? 'text-warning fill-warning' : 'text-border'}`}
+                  />
+                ))}
+                <span className="text-xs text-text-tertiary ml-2">{formatDate(existingReview.created_at)}</span>
+              </div>
+              {existingReview.comment && (
+                <p className="text-sm text-text-secondary">{existingReview.comment}</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-text-tertiary mb-2">이번 소싱은 어떠셨나요?</p>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setReviewRating(s)}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`w-8 h-8 ${s <= reviewRating ? 'text-warning fill-warning' : 'text-border hover:text-warning'}`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="소싱 경험을 간단히 작성해주세요 (선택)"
+                maxLength={200}
+                rows={3}
+                className="w-full border border-border rounded-[var(--radius-md)] px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+              <Button
+                size="sm"
+                onClick={handleReviewSubmit}
+                isLoading={isSubmittingReview}
+                disabled={reviewRating === 0}
+              >
+                리뷰 등록
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 취소 확인 모달 */}
       <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)} title="주문 취소">

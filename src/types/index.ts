@@ -6,6 +6,7 @@ export interface Profile {
   avatar_url: string | null;
   subscription_plan: 'free' | 'basic' | 'pro';
   subscription_expires_at: string | null;
+  preferred_categories?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -193,6 +194,15 @@ export interface SourcingCartItem {
   quantity: number;
   price_cny: number;
   price_krw: number;
+}
+
+export interface SourcingReview {
+  id: string;
+  order_id: string;
+  user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
 }
 
 export interface PaginatedResponse<T> {

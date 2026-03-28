@@ -47,9 +47,10 @@ export default function ShopPage() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedItem[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
+  const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 최근 검색어 & 사용자명 & 최근 본 상품 로드
+  // 최근 검색어 & 사용자명 & 최근 본 상품 & 취향 카테고리 로드
   useEffect(() => {
     try {
       setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
@@ -60,11 +61,14 @@ export default function ShopPage() {
       if (data.user) {
         supabase
           .from('profiles')
-          .select('name')
+          .select('name, preferred_categories')
           .eq('id', data.user.id)
           .single()
           .then(({ data: profile }) => {
             if (profile?.name) setUserName(profile.name);
+            if (profile?.preferred_categories?.length) {
+              setPreferredCategories(profile.preferred_categories);
+            }
           });
       }
     });
@@ -97,6 +101,12 @@ export default function ShopPage() {
     if (searchInput.trim()) {
       saveRecentSearch(searchInput.trim());
       setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
+      // DB 동기화 (fire and forget)
+      fetch('/api/sourcing/search-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: searchInput.trim() }),
+      }).catch(() => {});
     }
   };
 
@@ -211,6 +221,14 @@ export default function ShopPage() {
   const showPagination = !imageResults && result && result.total_pages > 1;
 
   const hasResults = !!(keyword || selectedCategory || imageResults);
+
+  // 취향 카테고리를 앞으로 정렬
+  const sortedCategories = categories
+    ? [
+        ...(categories.filter((c) => preferredCategories.includes(c.name))),
+        ...(categories.filter((c) => !preferredCategories.includes(c.name))),
+      ]
+    : [];
 
   return (
     <div className="p-6 lg:p-8">
@@ -327,17 +345,21 @@ export default function ShopPage() {
       </div>
 
       {/* 인기 카테고리 빠른 진입 */}
-      {!hasResults && categories && categories.length > 0 && (
+      {!hasResults && sortedCategories.length > 0 && (
         <div className="mb-6">
           <p className="text-xs font-medium text-text-tertiary mb-2 flex items-center gap-1">
             <Filter className="w-3.5 h-3.5" /> 인기 카테고리
           </p>
           <div className="flex gap-2 flex-wrap">
-            {categories.map((cat) => (
+            {sortedCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => handleCategoryClick(cat.name)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-full text-xs font-medium text-text-secondary hover:bg-primary-5 hover:border-primary hover:text-primary transition-colors"
+                className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border rounded-full text-xs font-medium transition-colors hover:bg-primary-5 hover:border-primary hover:text-primary ${
+                  preferredCategories.includes(cat.name)
+                    ? 'border-primary text-primary'
+                    : 'border-border text-text-secondary'
+                }`}
               >
                 <span>{cat.icon}</span>
                 {cat.name}
@@ -432,7 +454,7 @@ export default function ShopPage() {
           >
             전체
           </button>
-          {categories?.map((cat) => (
+          {sortedCategories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => { setSelectedCategory(cat.name); setPage(1); }}

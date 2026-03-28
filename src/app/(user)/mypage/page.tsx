@@ -102,6 +102,8 @@ export default function MyPage() {
         {[
           { label: '소싱 주문 내역', href: '/sourcing-orders' },
           { label: '주문 내역', href: '/mypage/orders' },
+          { label: '배송지 관리', href: '/mypage/addresses' },
+          { label: '찜목록', href: '/wishlist' },
           { label: '리뷰 관리', href: '/mypage/reviews' },
           { label: '프로필 설정', href: '/mypage/profile' },
         ].map((link) => (
