@@ -15,6 +15,10 @@ function cnyToKrw(priceCny: number, exchangeRate: number): number {
   return Math.round(priceCny * exchangeRate);
 }
 
+function stripHtml(str: string): string {
+  return str.replace(/<[^>]*>/g, '');
+}
+
 function normalizeImageUrl(url: string): string {
   if (!url) return '';
   // // 로 시작하면 https: 붙이기
@@ -34,8 +38,8 @@ export function mapSearchItemToProduct(
 
   return {
     product_id: String(item.offerId),
-    title: item.subject || '',
-    title_zh: item.subject || '',
+    title: stripHtml(item.subject || ''),
+    title_zh: stripHtml(item.subject || ''),
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
     images: imageUrl ? [imageUrl] : [],
@@ -75,8 +79,8 @@ export function mapDetailToProduct(
 
   return {
     product_id: String(detail.offerId),
-    title: detail.subject || '',
-    title_zh: detail.subject || '',
+    title: stripHtml(detail.subject || ''),
+    title_zh: stripHtml(detail.subject || ''),
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
     images: (detail.images || []).map(normalizeImageUrl),
