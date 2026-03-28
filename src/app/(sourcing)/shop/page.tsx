@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Search, ImagePlus, Filter, X, Upload, Clock, Zap, History } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
-import Pagination from '@/components/ui/Pagination';
 import { formatPrice } from '@/lib/utils';
 import { getRecentlyViewed } from '@/lib/recently-viewed';
 import type { RecentlyViewedItem } from '@/lib/recently-viewed';
@@ -38,7 +37,6 @@ export default function ShopPage() {
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [page, setPage] = useState(1);
   const [searchMode, setSearchMode] = useState<'keyword' | 'image'>('keyword');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isImageSearching, setIsImageSearching] = useState(false);
@@ -49,6 +47,7 @@ export default function ShopPage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // 최근 검색어 & 사용자명 & 최근 본 상품 & 취향 카테고리 로드
   useEffect(() => {
@@ -79,25 +78,50 @@ export default function ShopPage() {
     queryFn: () => fetch('/api/sourcing/categories').then((r) => r.json()),
   });
 
-  const { data: result, isLoading } = useQuery<PaginatedResponse<SourcingProduct>>({
-    queryKey: ['sourcing-search', keyword, selectedCategory, page],
-    queryFn: () => {
+  const {
+    data: infiniteData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery<PaginatedResponse<SourcingProduct>>({
+    queryKey: ['sourcing-search', keyword, selectedCategory],
+    queryFn: ({ pageParam }) => {
       const params = new URLSearchParams();
       if (keyword) params.set('keyword', keyword);
       if (selectedCategory) params.set('category', selectedCategory);
-      params.set('page', String(page));
-      params.set('per_page', '50');
+      params.set('page', String(pageParam));
+      params.set('per_page', '20');
       return fetch(`/api/sourcing/search?${params}`).then((r) => r.json());
     },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
     enabled: !imageResults,
+    staleTime: 5 * 60 * 1000,
   });
+
+  // 무한 스크롤: sentinel이 뷰포트에 들어오면 다음 페이지 로드
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMore(); },
+      { rootMargin: '300px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setImageResults(null);
     setSimilarSearchSource(null);
     setKeyword(searchInput);
-    setPage(1);
     if (searchInput.trim()) {
       saveRecentSearch(searchInput.trim());
       setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
@@ -115,7 +139,6 @@ export default function ShopPage() {
     setImageResults(null);
     setSimilarSearchSource(null);
     setKeyword(term);
-    setPage(1);
   };
 
   const removeRecent = (term: string) => {
@@ -135,7 +158,6 @@ export default function ShopPage() {
     setSimilarSearchSource(null);
     setKeyword('');
     setSearchInput('');
-    setPage(1);
   };
 
   // Image URL 기반 검색 (돋보기 버튼 / URL 직접 입력)
@@ -217,8 +239,8 @@ export default function ShopPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const displayProducts = imageResults || result?.data || [];
-  const showPagination = !imageResults && result && result.total_pages > 1;
+  const displayProducts = imageResults || infiniteData?.pages.flatMap((p) => p.data) || [];
+  const totalCount = infiniteData?.pages[0]?.total ?? 0;
 
   const hasResults = !!(keyword || selectedCategory || imageResults);
 
@@ -447,7 +469,7 @@ export default function ShopPage() {
         <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
           <Filter className="w-4 h-4 text-text-tertiary flex-shrink-0" />
           <button
-            onClick={() => { setSelectedCategory(''); setPage(1); }}
+            onClick={() => { setSelectedCategory(''); }}
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               !selectedCategory ? 'bg-primary text-white' : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
             }`}
@@ -457,7 +479,7 @@ export default function ShopPage() {
           {sortedCategories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => { setSelectedCategory(cat.name); setPage(1); }}
+              onClick={() => { setSelectedCategory(cat.name); }}
               className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 selectedCategory === cat.name
                   ? 'bg-primary text-white'
@@ -491,7 +513,8 @@ export default function ShopPage() {
                 {imageResults ? (
                   <>이미지 검색 결과 <strong className="text-text-primary">{imageResults.length}</strong>개</>
                 ) : (
-                  <>총 <strong className="text-text-primary">{result?.total || 0}</strong>개 상품</>
+                  <>총 <strong className="text-text-primary">{totalCount}</strong>개 상품</>
+
                 )}
               </p>
               {imageResults && (
@@ -573,13 +596,23 @@ export default function ShopPage() {
             </div>
           )}
 
-          {showPagination && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={page}
-                totalPages={result!.total_pages}
-                onPageChange={setPage}
-              />
+          {/* 무한 스크롤 sentinel */}
+          {!imageResults && (
+            <div ref={sentinelRef} className="h-12 flex items-center justify-center mt-6">
+              {isFetchingNextPage && (
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 bg-primary/40 rounded-full animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </div>
+              )}
+              {!hasNextPage && displayProducts.length > 0 && (
+                <p className="text-xs text-text-tertiary">모든 상품을 불러왔습니다</p>
+              )}
             </div>
           )}
         </>
