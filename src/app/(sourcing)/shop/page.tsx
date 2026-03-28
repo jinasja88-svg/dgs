@@ -12,6 +12,14 @@ import Pagination from '@/components/ui/Pagination';
 import { formatPrice } from '@/lib/utils';
 import type { SourcingProduct, SourcingCategory, PaginatedResponse } from '@/types';
 
+function proxyImg(url: string): string {
+  if (!url) return '';
+  if (url.includes('alicdn.com') || url.includes('1688.com/img')) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
 const MAX_RECENT = 8;
 
@@ -451,10 +459,9 @@ export default function ShopPage() {
                     <div className="aspect-square bg-surface flex items-center justify-center overflow-hidden relative">
                       {product.images[0] ? (
                         <img
-                          src={product.images[0]}
+                          src={proxyImg(product.images[0])}
                           alt={product.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <span className="text-4xl text-text-tertiary">📦</span>

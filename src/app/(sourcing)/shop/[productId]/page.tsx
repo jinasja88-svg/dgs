@@ -13,6 +13,14 @@ import type { SourcingProduct } from '@/types';
 
 const WISHLIST_KEY = 'ddalkkak-wishlist';
 
+function proxyImg(url: string): string {
+  if (!url) return '';
+  if (url.includes('alicdn.com') || url.includes('1688.com/img')) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 export default function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = use(params);
   const router = useRouter();
@@ -189,7 +197,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           <div className="aspect-square bg-white rounded-[var(--radius-lg)] overflow-hidden flex items-center justify-center border border-border-light">
             {displayProduct!.images[selectedImageIndex] ? (
               <img
-                src={displayProduct!.images[selectedImageIndex]}
+                src={proxyImg(displayProduct!.images[selectedImageIndex])}
                 alt={displayProduct!.title}
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -208,7 +216,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                     selectedImageIndex === i ? 'border-primary' : 'border-transparent'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={proxyImg(img)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
