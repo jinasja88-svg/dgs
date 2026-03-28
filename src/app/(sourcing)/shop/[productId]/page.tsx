@@ -56,7 +56,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   });
 
   // 상세 API 실패 시 검색 결과 fallback 사용 (hooks 이후, 조건부 렌더링 이전에 선언)
-  const displayProduct = product || (error && fallbackProduct) || null;
+  const displayProduct = product || fallbackProduct || null;
 
   const selectedSkuData = displayProduct?.skus?.find((s) => s.sku_id === selectedSku);
   const currentPrice = selectedSkuData?.price_krw || displayProduct?.price_krw || 0;
@@ -192,6 +192,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                 src={displayProduct!.images[selectedImageIndex]}
                 alt={displayProduct!.title}
                 className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <span className="text-6xl">📦</span>
@@ -207,7 +208,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
                     selectedImageIndex === i ? 'border-primary' : 'border-transparent'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={img} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </button>
               ))}
             </div>

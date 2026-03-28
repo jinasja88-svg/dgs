@@ -363,7 +363,7 @@ export default function ShopPage() {
       {/* Similar Search Source Banner */}
       {similarSearchSource && imageResults && (
         <div className="flex items-center gap-3 bg-white border border-border-light rounded-[var(--radius-lg)] p-3 mb-6">
-          <img src={similarSearchSource} alt="" className="w-12 h-12 object-cover rounded-[var(--radius-md)] flex-shrink-0" />
+          <img src={similarSearchSource} alt="" className="w-12 h-12 object-cover rounded-[var(--radius-md)] flex-shrink-0" referrerPolicy="no-referrer" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-text-primary">유사 상품 검색 결과</p>
             <p className="text-xs text-text-tertiary">이 이미지와 비슷한 상품 {imageResults.length}개를 찾았습니다</p>
@@ -454,6 +454,7 @@ export default function ShopPage() {
                           src={product.images[0]}
                           alt={product.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <span className="text-4xl text-text-tertiary">📦</span>
