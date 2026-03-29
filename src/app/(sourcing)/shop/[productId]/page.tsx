@@ -3,7 +3,7 @@
 import { useState, use, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -35,7 +35,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showDetailPage, setShowDetailPage] = useState(false);
 
   // URL 파라미터에서 검색 결과 기본 정보 추출 (상세 API 실패 시 폴백)
   const fallbackProduct: SourcingProduct | null = (() => {
@@ -424,63 +423,42 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         </div>
       </div>
 
-      {/* 1688 상세 페이지 섹션 */}
-      <DetailSection productId={productId} show={showDetailPage} onToggle={() => setShowDetailPage((v) => !v)} />
+      {/* 1688 상세 페이지 */}
+      <DetailSection productId={productId} />
     </div>
   );
 }
 
-function DetailSection({ productId, show, onToggle }: { productId: string; show: boolean; onToggle: () => void }) {
+function DetailSection({ productId }: { productId: string }) {
   const { data, isLoading } = useQuery<{ html: string }>({
     queryKey: ['product-desc', productId],
     queryFn: async () => {
       const r = await fetch(`/api/sourcing/product-desc/${productId}`);
       return r.json();
     },
-    enabled: show,
     staleTime: 15 * 60 * 1000,
   });
 
   return (
     <div className="mt-8">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-6 py-4 bg-white border border-border-light rounded-[var(--radius-lg)] hover:bg-surface transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-text-primary">1688 상세 페이지</span>
-          <a
-            href={`https://detail.1688.com/offer/${productId}.html`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-text-tertiary hover:text-primary"
-          >
-            새 탭에서 열기 <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-        {show ? <ChevronUp className="w-5 h-5 text-text-tertiary" /> : <ChevronDown className="w-5 h-5 text-text-tertiary" />}
-      </button>
-
-      {show && (
-        <div className="mt-2 border border-border-light rounded-[var(--radius-lg)] overflow-hidden bg-white">
-          {isLoading ? (
-            <div className="p-8 space-y-4">
-              <Skeleton className="h-64 w-full" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          ) : data?.html ? (
-            <div
-              className="p-4 [&_img]:max-w-full [&_img]:h-auto [&_img]:block [&_img]:mx-auto"
-              dangerouslySetInnerHTML={{ __html: data.html }}
-            />
-          ) : (
-            <div className="p-8 text-center text-text-tertiary">
-              상세 설명을 불러올 수 없습니다.
-            </div>
-          )}
-        </div>
-      )}
+      <h2 className="text-base font-semibold text-text-primary mb-3">상세 정보</h2>
+      <div className="border border-border-light rounded-[var(--radius-lg)] overflow-hidden bg-white">
+        {isLoading ? (
+          <div className="p-8 space-y-4">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : data?.html ? (
+          <div
+            className="p-4 [&_img]:max-w-full [&_img]:h-auto [&_img]:block [&_img]:mx-auto"
+            dangerouslySetInnerHTML={{ __html: data.html }}
+          />
+        ) : (
+          <div className="p-8 text-center text-text-tertiary">
+            상세 설명을 불러올 수 없습니다.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
