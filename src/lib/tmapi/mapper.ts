@@ -1,7 +1,7 @@
 import type { SourcingProduct, SourcingSku, SourcingSeller } from '@/types';
 import type { TmapiSearchItem, TmapiItemDetail, TmapiImageSearchItem } from './types';
 
-export function parsePriceRange(priceStr: string): number {
+function parsePriceRange(priceStr: string): number {
   if (!priceStr) return 0;
   const first = priceStr.split('-')[0];
   return parseFloat(first) || 0;
@@ -15,20 +15,24 @@ export function mapSearchItemToSourcingProduct(
   item: TmapiSearchItem,
   exchangeRate: number
 ): SourcingProduct {
-  const priceCny = parsePriceRange(item.priceInfo?.price);
+  const priceCny = parsePriceRange(item.price_info?.sale_price || item.price);
   return {
-    product_id: String(item.offerId),
-    title: item.subject,
-    title_zh: item.subject,
+    product_id: String(item.item_id),
+    title: item.title,
+    title_zh: item.title,
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
-    images: item.imageUrl ? [item.imageUrl] : [],
+    images: item.img ? [item.img] : [],
     skus: [],
     seller: {
-      name: item.companyName || item.sellerLoginId || '',
+      name: item.shop_info?.company_name || '',
+      years: item.shop_info?.shop_years,
+      rating: item.shop_info?.score_info?.composite_score
+        ? parseFloat(item.shop_info.score_info.composite_score)
+        : undefined,
     },
-    stock: item.quantitySummity || 0,
-    min_order: 1,
+    stock: 0,
+    min_order: parseInt(item.moq) || 1,
   };
 }
 
@@ -36,55 +40,56 @@ export function mapItemDetailToSourcingProduct(
   detail: TmapiItemDetail,
   exchangeRate: number
 ): SourcingProduct {
-  const priceCny = detail.priceInfo?.[0]
-    ? parseFloat(detail.priceInfo[0].price)
-    : 0;
+  const priceCny = parsePriceRange(detail.price_info?.price_min || detail.price_info?.price || '0');
 
-  const skus: SourcingSku[] = (detail.skuInfos || []).map((sku) => {
-    const skuPrice = parseFloat(sku.price) || priceCny;
-    const properties: Record<string, string> = {};
-    for (const attr of sku.specAttrs || []) {
-      properties[attr.attributeDisplayName] = attr.value;
+  const skus: SourcingSku[] = (detail.skus || []).map((sku) => {
+    const skuPrice = parseFloat(sku.sale_price) || priceCny;
+    // props_names format: "속성명:값1; 값2" — extract the values part
+    const name = sku.props_names
+      ? sku.props_names.replace(/^[^:]+:/, '').trim()
+      : sku.skuid;
+
+    // Find matching image from sku_props
+    let image: string | undefined;
+    if (sku.props_ids && detail.sku_props?.length) {
+      const [pid, vid] = sku.props_ids.split(':');
+      const prop = detail.sku_props.find((p) => p.pid === pid);
+      const val = prop?.values.find((v) => v.vid === vid);
+      if (val?.imageUrl) image = val.imageUrl;
     }
-    const name = (sku.specAttrs || []).map((a) => a.value).join(' / ') || String(sku.skuId);
+
     return {
-      sku_id: String(sku.skuId),
+      sku_id: sku.skuid,
       name,
       price_cny: skuPrice,
       price_krw: cnyToKrw(skuPrice, exchangeRate),
-      stock: sku.amountOnSale || 0,
-      image: sku.imageUrl,
-      properties,
+      stock: sku.stock || 0,
+      image,
     };
   });
 
-  const seller: SourcingSeller | null = detail.sellerInfo
+  const seller: SourcingSeller | null = detail.shop_info
     ? {
-        name: detail.sellerInfo.companyName || detail.sellerInfo.loginId || '',
-        rating: detail.sellerInfo.tp?.score,
-        years: detail.sellerInfo.yearOfBegin
-          ? new Date().getFullYear() - detail.sellerInfo.yearOfBegin
-          : undefined,
-        location: detail.sellerInfo.bizArea,
+        name: detail.shop_info.shop_name || detail.shop_info.seller_login_id || '',
+        location: detail.delivery_info?.location,
       }
     : null;
 
-  const totalStock = skus.length > 0
+  const totalStock = detail.stock || (skus.length > 0
     ? skus.reduce((sum, s) => sum + s.stock, 0)
-    : 0;
+    : 0);
 
   return {
-    product_id: String(detail.offerId),
-    title: detail.subject,
-    title_zh: detail.subject,
+    product_id: String(detail.item_id),
+    title: detail.title,
+    title_zh: detail.title,
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
-    images: detail.images || [],
+    images: detail.main_imgs || [],
     skus,
     seller,
     stock: totalStock,
-    category: detail.categoryName,
-    min_order: detail.quantityBegin || 1,
+    min_order: detail.tiered_price_info?.begin_num || 1,
   };
 }
 
@@ -92,17 +97,17 @@ export function mapImageSearchItemToSourcingProduct(
   item: TmapiImageSearchItem,
   exchangeRate: number
 ): SourcingProduct {
-  const priceCny = parsePriceRange(item.price);
+  const priceCny = parsePriceRange(item.price_info?.sale_price || item.price);
   return {
-    product_id: String(item.offerId),
-    title: item.subject,
-    title_zh: item.subject,
+    product_id: String(item.item_id),
+    title: item.title,
+    title_zh: item.title,
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
-    images: item.imageUrl ? [item.imageUrl] : [],
+    images: item.img ? [item.img] : [],
     skus: [],
     seller: {
-      name: item.companyName || '',
+      name: item.shop_info?.company_name || '',
     },
     stock: 0,
     min_order: 1,

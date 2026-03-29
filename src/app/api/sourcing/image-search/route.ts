@@ -33,17 +33,17 @@ export async function POST(request: NextRequest) {
       client.searchByImage({ img_url: image_url, page, page_size: 20 })
     );
 
-    const rawProducts = result.data.map((item) =>
+    const rawProducts = result.items.map((item) =>
       mapImageSearchItemToSourcingProduct(item, exchangeRate)
     );
     const products = await translateProducts(rawProducts, { skipSkus: true });
 
     const responseBody = {
       data: products,
-      total: result.totalCount || products.length,
+      total: result.total_count || products.length,
       page,
       per_page: 20,
-      total_pages: Math.ceil((result.totalCount || products.length) / 20),
+      total_pages: Math.ceil((result.total_count || products.length) / 20),
     };
 
     tmapiCache.set(cacheKey, responseBody, CACHE_TTL.IMAGE_SEARCH);

@@ -4,13 +4,12 @@ import type {
   TmapiSearchResult,
   TmapiItemDetail,
   TmapiImageSearchResult,
-  TmapiImageConvertResult,
   TmapiSearchParams,
   TmapiImageSearchParams,
 } from './types';
 
-const BASE_URL = 'http://api.tmapi.top';
-const TIMEOUT_MS = 10_000;
+const BASE_URL = 'https://api.tmapi.io';
+const TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 
 export class TmapiClient {
@@ -71,7 +70,7 @@ export class TmapiClient {
   }
 
   async searchByKeyword(params: TmapiSearchParams): Promise<TmapiSearchResult> {
-    return this.request<TmapiSearchResult>('/ali/search/keyword', {
+    return this.request<TmapiSearchResult>('/1688/search/items', {
       keyword: params.keyword,
       page: String(params.page || 1),
       page_size: String(Math.min(params.page_size || 20, 20)),
@@ -80,24 +79,17 @@ export class TmapiClient {
   }
 
   async getItemDetail(itemId: string, language?: string): Promise<TmapiItemDetail> {
-    return this.request<TmapiItemDetail>('/ali/item_detail', {
+    return this.request<TmapiItemDetail>('/1688/item_detail', {
       item_id: itemId,
-      ...(language ? { language } : {}),
+      language: language || 'ko',
     });
   }
 
   async searchByImage(params: TmapiImageSearchParams): Promise<TmapiImageSearchResult> {
-    return this.request<TmapiImageSearchResult>('/ali/search/image', {
+    return this.request<TmapiImageSearchResult>('/1688/search/image', {
       img_url: params.img_url,
       page: String(params.page || 1),
       page_size: String(Math.min(params.page_size || 20, 20)),
     });
-  }
-
-  async convertImageUrl(url: string): Promise<string> {
-    const result = await this.request<TmapiImageConvertResult>('/ali/tool/image_convert', {
-      url,
-    });
-    return result.url;
   }
 }

@@ -1,4 +1,4 @@
-// TMAPI raw response types
+// TMAPI (api.tmapi.io) response types for 1688
 
 export interface TmapiResponse<T> {
   code: number;
@@ -6,98 +6,150 @@ export interface TmapiResponse<T> {
   data: T;
 }
 
-// Keyword search
+// ─── Keyword Search ───
+
 export interface TmapiSearchResult {
-  totalCount: number;
-  pageSize: number;
-  pageIndex: number;
-  offerList: TmapiSearchItem[];
+  page: number;
+  page_size: number;
+  has_next_page: boolean;
+  total_count: number;
+  keyword: string;
+  sort: string;
+  items: TmapiSearchItem[];
 }
 
 export interface TmapiSearchItem {
-  offerId: number;
-  subject: string;
-  imageUrl: string;
-  priceInfo: {
-    price: string; // e.g. "25.50" or "25.50-35.00"
+  item_id: number;
+  product_url: string;
+  title: string;
+  img: string;
+  price: string;
+  price_info: {
+    price: string;
+    sale_price: string;
+    origin_price: string;
   };
-  quantitySummity: number;
-  tradeQuantity: number;
-  sellerLoginId: string;
-  sellerMemberId: string;
-  companyName: string;
+  currency: string;
+  moq: string;
+  quantity_begin: string;
+  sale_info: {
+    sale_quantity_90days: string;
+  };
+  delivery_info: {
+    area_from: string[];
+    free_shipping: boolean;
+  };
+  shop_info: {
+    company_name: string;
+    is_super_factory: boolean;
+    shop_years: number;
+    score_info?: {
+      composite_score: string;
+    };
+  };
+  item_repurchase_rate: string;
+  is_ad?: boolean;
 }
 
-// Item detail
+// ─── Item Detail ───
+
 export interface TmapiItemDetail {
-  offerId: number;
-  subject: string;
-  categoryName: string;
-  images: string[];
-  priceInfo: TmapiPriceRange[];
-  skuInfos: TmapiSkuInfo[];
-  sellerInfo: TmapiSellerInfo;
-  quantityBegin: number;
-  saleCount: number;
-  description: string;
-}
-
-export interface TmapiPriceRange {
-  beginAmount: number;
-  price: string;
-}
-
-export interface TmapiSkuInfo {
-  skuId: number;
-  specAttrs: TmapiSpecAttr[];
-  price: string;
-  amountOnSale: number;
-  imageUrl?: string;
-}
-
-export interface TmapiSpecAttr {
-  attributeDisplayName: string;
-  value: string;
-}
-
-export interface TmapiSellerInfo {
-  loginId: string;
-  memberId: string;
-  companyName: string;
-  sellerLevel: string;
-  yearOfBegin: number;
-  tp: {
-    score: number;
+  item_id: number;
+  product_url: string;
+  title: string;
+  category_id: number;
+  currency: string;
+  main_imgs: string[];
+  video_url?: string;
+  detail_url?: string;
+  sale_count: string;
+  price_info: {
+    price: string;
+    price_min: string;
+    price_max: string;
+    origin_price_min: string;
+    origin_price_max: string;
+    discount_price: string;
   };
-  bizArea: string;
+  tiered_price_info?: {
+    begin_num: number;
+    prices: Array<{ begin_num: number; price: string }>;
+  };
+  shop_info: {
+    shop_name: string;
+    shop_url: string;
+    seller_login_id: string;
+    seller_user_id: string;
+    seller_member_id: string;
+  };
+  delivery_info?: {
+    location: string;
+    delivery_fee: number;
+  };
+  service_tags?: string[];
+  sku_props: TmapiSkuProp[];
+  skus: TmapiSku[];
+  stock: number;
+  is_sold_out: boolean;
+  product_props?: Array<Record<string, string>>;
 }
 
-// Image search
+export interface TmapiSkuProp {
+  pid: string;
+  prop_name: string;
+  values: Array<{
+    vid: string;
+    name: string;
+    imageUrl: string;
+  }>;
+}
+
+export interface TmapiSku {
+  skuid: string;
+  specid: string;
+  sale_price: string;
+  origin_price: string;
+  stock: number;
+  props_ids: string;
+  props_names: string;
+  sale_count: number | null;
+}
+
+// ─── Image Search ───
+
 export interface TmapiImageSearchResult {
-  totalCount: number;
-  pageSize: number;
-  data: TmapiImageSearchItem[];
+  page: number;
+  page_size: number;
+  total_count: number;
+  items: TmapiImageSearchItem[];
 }
 
 export interface TmapiImageSearchItem {
-  offerId: number;
-  subject: string;
-  imageUrl: string;
+  item_id: number;
+  product_url: string;
+  title: string;
+  img: string;
   price: string;
-  companyName: string;
+  price_info: {
+    price: string;
+    sale_price: string;
+    origin_price: string;
+  };
+  shop_info: {
+    company_name: string;
+  };
+  sale_info?: {
+    sale_quantity_90days: string;
+  };
 }
 
-// Image convert
-export interface TmapiImageConvertResult {
-  url: string;
-}
+// ─── Search Params ───
 
-// Search params
 export interface TmapiSearchParams {
   keyword: string;
   page?: number;
   page_size?: number;
-  sort?: 'default' | 'price_asc' | 'price_desc' | 'sale_desc';
+  sort?: 'default' | 'sales' | 'price_up' | 'price_down';
 }
 
 export interface TmapiImageSearchParams {

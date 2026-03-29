@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
-    let products = result.offerList.map((item) =>
+    let products = result.items.map((item) =>
       mapSearchItemToSourcingProduct(item, exchangeRate)
     );
 
@@ -67,10 +67,10 @@ export async function GET(request: NextRequest) {
 
     const responseBody = {
       data: products,
-      total: result.totalCount || products.length,
+      total: result.total_count || products.length,
       page,
       per_page: perPage,
-      total_pages: Math.ceil((result.totalCount || products.length) / perPage),
+      total_pages: Math.ceil((result.total_count || products.length) / perPage),
     };
 
     tmapiCache.set(cacheKey, responseBody, CACHE_TTL.SEARCH);
