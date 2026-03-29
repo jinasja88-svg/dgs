@@ -30,8 +30,8 @@ The `src/app/` directory uses Next.js route groups (parentheses):
 
 | Group | Routes |
 |-------|--------|
-| `(sourcing)` | `/shop`, `/shop/[productId]`, `/sourcing-orders`, `/wishlist`, `/detail-generator` |
-| `(user)` | `/mypage`, `/mypage/profile`, `/mypage/orders`, `/mypage/reviews` |
+| `(sourcing)` | `/shop`, `/shop/[productId]`, `/cart`, `/sourcing-orders`, `/wishlist`, `/detail-generator` |
+| `(user)` | `/mypage`, `/mypage/profile`, `/mypage/addresses`, `/mypage/orders`, `/mypage/reviews` |
 | `(auth)` | `/login`, `/signup`, `/reset-password` |
 | `(checkout)` | `/checkout/success` |
 | `(info)` | `/about`, `/faq`, `/terms`, `/privacy`, `/contact`, `/notices` |
@@ -61,12 +61,15 @@ Previously used for direct 1688 MTOP protocol calls via Squid proxy. Now replace
 | `search` | Keyword search — translates Korean→Chinese, calls TMAPI, caches 5 min |
 | `product/[id]` | Product detail — TMAPI with `language=ko`, caches 15 min, no Papago needed |
 | `image-search` | Image URL search via TMAPI, translates results, caches 10 min |
-| `orders` | GET list / POST create sourcing order |
-| `orders/[id]` | GET / PATCH single order (status, tracking, admin note) |
+| `orders` | GET list / POST create sourcing order (accepts `items[]` array for cart checkout) |
+| `orders/[id]` | GET / PATCH single order (status, tracking, admin note, cancellation) |
+| `reviews` | GET (by `?order_id=`) / POST — `sourcing_reviews` table; only allowed on `delivered` orders |
 | `wishlist` | GET / POST / DELETE — `sourcing_wishlist_items` Supabase table |
 | `search-history` | GET / POST / DELETE — `search_history` Supabase table |
 | `categories` | Static category list for filter UI |
 | `product-page/[id]` | HTML scaffold for product page preview |
+
+`src/app/api/addresses/` — GET/POST shipping addresses; `addresses/[id]` — PATCH/DELETE. Table: `shipping_addresses`.
 
 ### Supabase Clients
 
@@ -101,9 +104,12 @@ const result = await logApiCall('search', () => client.searchByKeyword(params));
 
 ### Client-Side State
 
-- **`src/lib/recently-viewed.ts`** — localStorage: 12 most recently viewed products (`ddalkkak-recently-viewed`)
-- **`src/lib/cart.ts`** — localStorage cart state
-- Recent searches: localStorage key `ddalkkak-recent-searches`; also synced to `search_history` DB table (fire-and-forget POST)
+| Utility | Key | Max | Notes |
+|---------|-----|-----|-------|
+| `src/lib/cart.ts` | `ddalkkak-cart` | 50 items | `addToCart`, `updateCartQty`, `removeFromCart`, `clearCart`, `getCartCount`. Dispatches `cart-updated` custom event on every mutation so `Header` badge stays in sync. Cart items keyed by `product_id + (sku_id \|\| '')`. |
+| `src/lib/recently-viewed.ts` | `ddalkkak-recently-viewed` | 12 items | Auto-saved on product detail page visit. Shown on shop homepage when no search active. |
+| Recent searches | `ddalkkak-recent-searches` | 10 terms | localStorage primary; `POST /api/sourcing/search-history` fire-and-forget on each search. |
+| Wishlist | `ddalkkak-wishlist` | unlimited | localStorage for non-logged-in users. On login, localStorage items are auto-migrated to DB (`sourcing_wishlist_items`) and localStorage is cleared. |
 
 ### Shop Page — Infinite Scroll
 
@@ -116,7 +122,9 @@ const result = await logApiCall('search', () => client.searchByKeyword(params));
 
 - `SourcingProduct` — 1688 product with dual pricing (CNY + KRW), SKUs, seller info
 - `SourcingOrder` — Import order (status: `pending|paid|purchasing|shipping|delivered|cancelled`)
-- `Profile` — User with `role: 'user'|'admin'` and subscription plan (`free|basic|pro`)
+- `SourcingCartItem` — Cart item: `product_id`, `title`, `image`, optional `sku_id`/`sku_name`, `quantity`, `price_cny`, `price_krw`
+- `SourcingReview` — Post-delivery review: `order_id`, `rating` (1–5), optional `comment`
+- `Profile` — User with `role: 'user'|'admin'`, subscription plan (`free|basic|pro`), and `preferred_categories?: string[]`
 - `src/types/supabase.ts` — Auto-generated from live schema via `supabase gen types typescript --project-id bvntczzdjirqtpudfpae`. Regenerate after schema changes.
 
 ### UI Components
@@ -148,7 +156,19 @@ supabase link --project-ref bvntczzdjirqtpudfpae --password <db-password>
 supabase db push
 ```
 
-Key tables beyond standard auth: `profiles` (with `role` column), `sourcing_orders`, `sourcing_wishlist_items`, `search_history`, `api_call_logs` (deny-all RLS, service role only).
+Key tables beyond standard auth:
+
+| Table | Notes |
+|-------|-------|
+| `profiles` | `role` column + `preferred_categories text[]` (added manually) |
+| `sourcing_orders` | Order lifecycle; `items jsonb[]` column holds per-product details |
+| `sourcing_wishlist_items` | Per-user wishlist; synced from localStorage on login |
+| `sourcing_reviews` | One review per order (UNIQUE on `order_id, user_id`); only insertable when order `status = 'delivered'` |
+| `search_history` | Keyword search log per user |
+| `shipping_addresses` | User delivery addresses with `is_default` flag |
+| `api_call_logs` | deny-all RLS, service role only |
+
+New tables (`shipping_addresses`, `sourcing_reviews`) and `preferred_categories` column must be created manually in Supabase SQL Editor — they are **not** in the migrations directory.
 
 After schema changes, regenerate TypeScript types:
 ```bash
