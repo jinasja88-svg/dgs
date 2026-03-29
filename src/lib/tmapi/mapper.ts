@@ -91,6 +91,7 @@ export function mapItemDetailToSourcingProduct(
     seller,
     stock: totalStock,
     min_order: detail.tiered_price_info?.begin_num || 1,
+    detail_url: detail.detail_url,
   };
 }
 

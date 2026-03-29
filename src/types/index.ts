@@ -117,6 +117,7 @@ export interface SourcingProduct {
   stock: number;
   category?: string;
   min_order?: number;
+  detail_url?: string;
 }
 
 export interface SourcingSku {
