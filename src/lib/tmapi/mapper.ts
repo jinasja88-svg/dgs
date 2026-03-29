@@ -82,7 +82,8 @@ export function mapItemDetailToSourcingProduct(
   return {
     product_id: String(detail.item_id),
     title: detail.title,
-    title_zh: detail.title,
+    // title_zh: language=ko 호출 시 title이 이미 한국어이므로 중국어 원본 없음
+    // 검색 목록에서 이미 title_zh가 설정되어 클라이언트에 전달됨
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
     images: detail.main_imgs || [],

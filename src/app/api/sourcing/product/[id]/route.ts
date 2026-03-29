@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getTmapiClient, tmapiCache, CACHE_TTL, mapItemDetailToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
-import { translateProducts } from '@/lib/translation';
 
 export async function GET(
   _request: NextRequest,
@@ -19,15 +18,19 @@ export async function GET(
 
   try {
     const client = getTmapiClient();
-    const exchangeRate = await getExchangeRate();
-    const detail = await logApiCall('product', () => client.getItemDetail(id));
+
+    // 환율 + TMAPI 상세(한국어) 병렬 실행
+    // TMAPI language=ko가 제목/SKU 속성을 한국어로 반환하므로 Papago 번역 불필요
+    const [exchangeRate, detail] = await Promise.all([
+      getExchangeRate(),
+      logApiCall('product', () => client.getItemDetail(id, 'ko')),
+    ]);
 
     const product = mapItemDetailToSourcingProduct(detail, exchangeRate);
-    const [translated] = await translateProducts([product]);
 
-    tmapiCache.set(cacheKey, translated, CACHE_TTL.DETAIL);
+    tmapiCache.set(cacheKey, product, CACHE_TTL.DETAIL);
 
-    return NextResponse.json(translated);
+    return NextResponse.json(product);
   } catch (err) {
     console.error('Product detail error:', err);
     const message = err instanceof Error ? err.message : '상품을 찾을 수 없습니다';
