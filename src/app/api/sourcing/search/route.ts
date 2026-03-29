@@ -1,11 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { searchByKeyword, mapSearchItemToProduct } from '@/lib/ali1688';
+import { getTmapiClient, tmapiCache, CACHE_TTL, mapSearchItemToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
 import { translateProducts, translateSearchQuery } from '@/lib/translation';
-
-// 인메모리 검색 결과 캐시 (5분 TTL)
-const searchCache = new Map<string, { data: unknown; expiresAt: number }>();
 
 const CATEGORY_KEYWORD_MAP: Record<string, string> = {
   '의류/패션': '服装',
@@ -25,7 +22,7 @@ export async function GET(request: NextRequest) {
   const keyword = searchParams.get('keyword') || '';
   const category = searchParams.get('category') || '';
   const page = parseInt(searchParams.get('page') || '1');
-  const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 50);
+  const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 20);
 
   // 검색 키워드 조합 (한국어 키워드는 중국어로 번역)
   let searchKeyword = await translateSearchQuery(keyword);
@@ -38,23 +35,25 @@ export async function GET(request: NextRequest) {
   }
 
   // 캐시 확인
-  const cacheKey = `${searchKeyword}:${page}:${perPage}`;
-  const hit = searchCache.get(cacheKey);
-  if (hit && hit.expiresAt > Date.now()) {
-    return NextResponse.json(hit.data);
+  const cacheKey = `search:${searchKeyword}:${page}:${perPage}`;
+  const cached = tmapiCache.get<unknown>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
   }
 
   try {
-    // 환율 조회 + 1688 검색 병렬 실행
+    const client = getTmapiClient();
+
+    // 환율 조회 + TMAPI 검색 병렬 실행
     const [exchangeRate, result] = await Promise.all([
       getExchangeRate(),
       logApiCall('search', () =>
-        searchByKeyword({ keyword: searchKeyword, page, pageSize: perPage })
+        client.searchByKeyword({ keyword: searchKeyword, page, page_size: perPage })
       ),
     ]);
 
     let products = result.offerList.map((item) =>
-      mapSearchItemToProduct(item, exchangeRate)
+      mapSearchItemToSourcingProduct(item, exchangeRate)
     );
 
     if (category) {
@@ -63,7 +62,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 검색 목록은 SKU 표시 안 하므로 title만 번역 (Papago 호출 ~90% 감소)
+    // 검색 목록은 SKU 표시 안 하므로 title만 번역
     products = await translateProducts(products, { skipSkus: true });
 
     const responseBody = {
@@ -71,10 +70,10 @@ export async function GET(request: NextRequest) {
       total: result.totalCount || products.length,
       page,
       per_page: perPage,
-      total_pages: result.pageCount || Math.ceil((result.totalCount || products.length) / perPage),
+      total_pages: Math.ceil((result.totalCount || products.length) / perPage),
     };
 
-    searchCache.set(cacheKey, { data: responseBody, expiresAt: Date.now() + 5 * 60 * 1000 });
+    tmapiCache.set(cacheKey, responseBody, CACHE_TTL.SEARCH);
 
     return NextResponse.json(responseBody);
   } catch (err) {

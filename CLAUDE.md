@@ -39,17 +39,24 @@ The `src/app/` directory uses Next.js route groups (parentheses):
 
 Home (`/`) redirects to `/shop`.
 
-### 1688 API Integration (`src/lib/ali1688/`)
+### 1688 API Integration — TMAPI (`src/lib/tmapi/`)
 
-The core of the product is direct integration with 1688 via the **MTOP protocol**:
+The core of the product uses **TMAPI** (`api.tmapi.top`), a paid third-party API service for 1688 data:
 
-- **`mtop.ts`** — Low-level MTOP request handler. Signs requests with `MD5(token + "&" + timestamp + "&" + appKey + "&" + data)`. Manages token cache (25-minute TTL) and auto-refreshes on `TOKEN_EMPTY` errors. Supports three proxy modes:
-  - `ALI1688_HTTPS_PROXY` — HTTP forward proxy via Squid (current production: `http://8.153.18.156:3128` on Alibaba Cloud ECS cn-shanghai)
-  - `ALI1688_PROXY_URL` — Express reverse proxy (alternative)
-  - Direct (no proxy)
-- **`client.ts`** — High-level API operations: `searchByKeyword`, `searchByImage`, `uploadImage`, `getItemDetail`, `imageUrlToBase64`
+- **`client.ts`** — `TmapiClient` class with `searchByKeyword`, `searchByImage`, `getItemDetail`, `convertImageUrl`. Includes retry logic with exponential backoff and timeout handling.
+- **`types.ts`** — TMAPI raw response types (`TmapiSearchResult`, `TmapiItemDetail`, `TmapiImageSearchResult`)
+- **`mapper.ts`** — Maps TMAPI responses to `SourcingProduct` domain models
+- **`cache.ts`** — LRU cache (500 entries) with TTL (search: 5m, detail: 15m, image-search: 10m)
+- **`errors.ts`** — `TmapiError`, `TmapiRateLimitError`, `TmapiAuthError`
+- **`index.ts`** — Singleton `getTmapiClient()` (reads `TMAPI_API_TOKEN` env var), exports
+
+### Legacy: Direct MTOP Integration (`src/lib/ali1688/`)
+
+Previously used direct MTOP protocol integration (now replaced by TMAPI). Still used for the product page HTML proxy (`product-page/[id]/route.ts`).
+
+- **`mtop.ts`** — Low-level MTOP request handler with token management and proxy support
+- **`client.ts`** — Direct 1688 API operations (keyword search, image search, item detail scraping)
 - **`mapper.ts`** — Maps raw 1688 API responses to `SourcingProduct` domain models
-- **`index.ts`** — Public exports
 
 ### Supabase Clients
 
@@ -103,7 +110,8 @@ Logs `endpoint`, `duration_ms`, `success`, `error_msg`. Logging failures are sil
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY      # Required for api-logger and admin operations
-ALI1688_HTTPS_PROXY            # Squid proxy (e.g., http://8.153.18.156:3128)
+TMAPI_API_TOKEN                # TMAPI (api.tmapi.top) subscription token for 1688 API
+ALI1688_HTTPS_PROXY            # Squid proxy — legacy, not needed with TMAPI
 NAVER_CLIENT_ID                # Papago translation
 NAVER_CLIENT_SECRET
 ADMIN_EMAILS                   # Comma-separated admin email whitelist

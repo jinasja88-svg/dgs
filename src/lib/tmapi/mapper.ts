@@ -19,6 +19,7 @@ export function mapSearchItemToSourcingProduct(
   return {
     product_id: String(item.offerId),
     title: item.subject,
+    title_zh: item.subject,
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
     images: item.imageUrl ? [item.imageUrl] : [],
@@ -75,6 +76,7 @@ export function mapItemDetailToSourcingProduct(
   return {
     product_id: String(detail.offerId),
     title: detail.subject,
+    title_zh: detail.subject,
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
     images: detail.images || [],
@@ -94,6 +96,7 @@ export function mapImageSearchItemToSourcingProduct(
   return {
     product_id: String(item.offerId),
     title: item.subject,
+    title_zh: item.subject,
     price_cny: priceCny,
     price_krw: cnyToKrw(priceCny, exchangeRate),
     images: item.imageUrl ? [item.imageUrl] : [],
