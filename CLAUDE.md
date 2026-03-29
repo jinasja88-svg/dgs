@@ -21,7 +21,7 @@ No test runner is configured.
 ### Tech Stack
 - **Next.js 16** (App Router) + React 19 + TypeScript 5
 - **Tailwind CSS 4** with `@tailwindcss/postcss`
-- **Supabase** (Postgres + Auth + Storage)
+- **Supabase** (Postgres + Auth + Storage) — project ref `bvntczzdjirqtpudfpae` (ap-southeast-1)
 - **TanStack Query v5** for client-side data fetching
 - Path alias: `@/*` → `src/*`
 
@@ -41,22 +41,32 @@ Home (`/`) redirects to `/shop`.
 
 ### 1688 API Integration — TMAPI (`src/lib/tmapi/`)
 
-The core of the product uses **TMAPI** (`api.tmapi.top`), a paid third-party API service for 1688 data:
+All product data comes from **TMAPI** (`api.tmapi.io`), a paid third-party REST service wrapping the 1688 API:
 
-- **`client.ts`** — `TmapiClient` class with `searchByKeyword`, `searchByImage`, `getItemDetail`, `convertImageUrl`. Includes retry logic with exponential backoff and timeout handling.
-- **`types.ts`** — TMAPI raw response types (`TmapiSearchResult`, `TmapiItemDetail`, `TmapiImageSearchResult`)
-- **`mapper.ts`** — Maps TMAPI responses to `SourcingProduct` domain models
-- **`cache.ts`** — LRU cache (500 entries) with TTL (search: 5m, detail: 15m, image-search: 10m)
+- **`client.ts`** — `TmapiClient` class: `searchByKeyword`, `searchByImage`, `getItemDetail` (supports `language=ko` for Korean responses). 15s timeout, 2-retry exponential backoff, rate-limit handling.
+- **`types.ts`** — TMAPI raw response types
+- **`mapper.ts`** — Maps TMAPI responses to `SourcingProduct` domain model. Three mappers: `mapSearchItemToSourcingProduct`, `mapItemDetailToSourcingProduct`, `mapImageSearchItemToSourcingProduct`
+- **`cache.ts`** — LRU cache (500 entries), TTL constants: `CACHE_TTL.SEARCH` (5m), `CACHE_TTL.DETAIL` (15m), `CACHE_TTL.IMAGE_SEARCH` (10m)
 - **`errors.ts`** — `TmapiError`, `TmapiRateLimitError`, `TmapiAuthError`
-- **`index.ts`** — Singleton `getTmapiClient()` (reads `TMAPI_API_TOKEN` env var), exports
+- **`index.ts`** — Singleton `getTmapiClient()` (reads `TMAPI_API_TOKEN`), re-exports `tmapiCache` and `CACHE_TTL`
 
 ### Legacy: Direct MTOP Integration (`src/lib/ali1688/`)
 
-Previously used direct MTOP protocol integration (now replaced by TMAPI). Still used for the product page HTML proxy (`product-page/[id]/route.ts`).
+Previously used for direct 1688 MTOP protocol calls via Squid proxy. Now replaced by TMAPI. Retained in case direct access is needed (image upload, product page scraping).
 
-- **`mtop.ts`** — Low-level MTOP request handler with token management and proxy support
-- **`client.ts`** — Direct 1688 API operations (keyword search, image search, item detail scraping)
-- **`mapper.ts`** — Maps raw 1688 API responses to `SourcingProduct` domain models
+### Sourcing API Routes (`src/app/api/sourcing/`)
+
+| Route | Purpose |
+|-------|---------|
+| `search` | Keyword search — translates Korean→Chinese, calls TMAPI, caches 5 min |
+| `product/[id]` | Product detail — TMAPI with `language=ko`, caches 15 min, no Papago needed |
+| `image-search` | Image URL search via TMAPI, translates results, caches 10 min |
+| `orders` | GET list / POST create sourcing order |
+| `orders/[id]` | GET / PATCH single order (status, tracking, admin note) |
+| `wishlist` | GET / POST / DELETE — `sourcing_wishlist_items` Supabase table |
+| `search-history` | GET / POST / DELETE — `search_history` Supabase table |
+| `categories` | Static category list for filter UI |
+| `product-page/[id]` | HTML scaffold for product page preview |
 
 ### Supabase Clients
 
@@ -65,20 +75,18 @@ Three separate clients for different contexts:
 | File | Usage |
 |------|-------|
 | `src/lib/supabase.ts` | Browser/client components |
-| `src/lib/supabase-server.ts` | Server Components (reads cookies) |
-| `src/lib/supabase-admin.ts` | API routes needing service role (bypasses RLS) |
+| `src/lib/supabase-server.ts` | Server Components (reads cookies) — `createServerSupabaseClient()` |
+| `src/lib/supabase-admin.ts` | API routes needing service role (bypasses RLS) — `createAdminClient()` |
 
 Use `createAdminClient()` only in API routes for privileged writes (e.g., `api_call_logs`).
 
 ### API Logging
 
-`src/lib/api-logger.ts` wraps 1688 API calls and records to the `api_call_logs` Supabase table:
+`src/lib/api-logger.ts` wraps TMAPI calls and records to `api_call_logs` (service role only):
 
 ```ts
-const result = await logApiCall('search', () => searchByKeyword(params));
+const result = await logApiCall('search', () => client.searchByKeyword(params));
 ```
-
-Logs `endpoint`, `duration_ms`, `success`, `error_msg`. Logging failures are silently ignored. The `api_call_logs` table has RLS enabled with a deny-all policy — only the service role key can write.
 
 ### Middleware (`src/middleware.ts`)
 
@@ -88,14 +96,28 @@ Logs `endpoint`, `duration_ms`, `success`, `error_msg`. Logging failures are sil
 
 ### Exchange Rate & Translation
 
-- **`src/lib/exchange-rate.ts`** — Fetches CNY→KRW rate with 1-hour in-memory cache. Falls back to 208 KRW/CNY if APIs fail.
-- **`src/lib/translation/`** — Korean↔Chinese translation via Naver Papago API, with a static lookup table for common terms and in-memory session cache.
+- **`src/lib/exchange-rate.ts`** — Fetches CNY→KRW rate with 1-hour in-memory cache. Falls back to 208 KRW/CNY.
+- **`src/lib/translation/`** — Korean↔Chinese via Naver Papago API. Pipeline: static lookup table (`lookup.ts`) → in-memory LRU cache → Papago API call. `translateProducts(products, { skipSkus: true })` used in search/image-search routes (SKU translation only on product detail). Concurrency: 15 products at a time.
 
-### Key Types (`src/types/index.ts`)
+### Client-Side State
+
+- **`src/lib/recently-viewed.ts`** — localStorage: 12 most recently viewed products (`ddalkkak-recently-viewed`)
+- **`src/lib/cart.ts`** — localStorage cart state
+- Recent searches: localStorage key `ddalkkak-recent-searches`; also synced to `search_history` DB table (fire-and-forget POST)
+
+### Shop Page — Infinite Scroll
+
+`src/app/(sourcing)/shop/page.tsx` uses `useInfiniteQuery` (TanStack Query v5):
+- Loads 20 products per page
+- `IntersectionObserver` on a sentinel element (300px before bottom) triggers `fetchNextPage()`
+- `queryKey: ['sourcing-search', keyword, selectedCategory]` — changing either resets the list automatically
+
+### Key Types (`src/types/index.ts` and `src/types/supabase.ts`)
 
 - `SourcingProduct` — 1688 product with dual pricing (CNY + KRW), SKUs, seller info
 - `SourcingOrder` — Import order (status: `pending|paid|purchasing|shipping|delivered|cancelled`)
-- `Profile` — User with subscription plan (`free|basic|pro`)
+- `Profile` — User with `role: 'user'|'admin'` and subscription plan (`free|basic|pro`)
+- `src/types/supabase.ts` — Auto-generated from live schema via `supabase gen types typescript --project-id bvntczzdjirqtpudfpae`. Regenerate after schema changes.
 
 ### UI Components
 
@@ -110,33 +132,25 @@ Logs `endpoint`, `duration_ms`, `success`, `error_msg`. Logging failures are sil
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY      # Required for api-logger and admin operations
-TMAPI_API_TOKEN                # TMAPI (api.tmapi.top) subscription token for 1688 API
-ALI1688_HTTPS_PROXY            # Squid proxy — legacy, not needed with TMAPI
+TMAPI_API_TOKEN                # TMAPI (api.tmapi.io) subscription token
 NAVER_CLIENT_ID                # Papago translation
 NAVER_CLIENT_SECRET
 ADMIN_EMAILS                   # Comma-separated admin email whitelist
-EXCHANGE_RATE_API_KEY          # Optional paid tier for exchange rates
+EXCHANGE_RATE_API_KEY          # Optional — paid tier for exchange rates
+ALI1688_HTTPS_PROXY            # Optional — legacy Squid proxy (not needed with TMAPI)
 ```
 
-## Supabase Schema Notes
+## Supabase Schema
 
-The `api_call_logs` table was created manually (not via migrations):
-```sql
-CREATE TABLE api_call_logs (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  endpoint text NOT NULL,  -- 'search' | 'image-search' | 'product'
-  duration_ms integer,
-  success boolean NOT NULL,
-  error_msg text,
-  created_at timestamptz DEFAULT now()
-);
-ALTER TABLE api_call_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "service role only" ON api_call_logs USING (false);
+Schema is managed via `supabase/` directory. Migrations are applied with:
+```bash
+supabase link --project-ref bvntczzdjirqtpudfpae --password <db-password>
+supabase db push
 ```
 
-## Infrastructure
+Key tables beyond standard auth: `profiles` (with `role` column), `sourcing_orders`, `sourcing_wishlist_items`, `search_history`, `api_call_logs` (deny-all RLS, service role only).
 
-- **ECS Instance**: Alibaba Cloud cn-shanghai, `i-uf66j50e8wkhf1trvf63`, IP `8.153.18.156`
-- **Squid Proxy**: Running on port 3128, routes `.1688.com` traffic
-- **Supabase Project**: `gppserrdbfznhcekafaz` (region: ap-southeast-1)
-- The ECS instance is PrePaid (monthly), **not** PAYG — check expiry before making changes
+After schema changes, regenerate TypeScript types:
+```bash
+supabase gen types typescript --project-id bvntczzdjirqtpudfpae 2>/dev/null > src/types/supabase.ts
+```
