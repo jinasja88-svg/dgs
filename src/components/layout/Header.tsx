@@ -57,7 +57,7 @@ export default function Header() {
           isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
         )}
       >
-        <div className="max-w-7xl mx-auto pl-2 pr-4 sm:pl-3 sm:pr-6 lg:pl-4 lg:pr-8">
+        <div className="max-w-7xl mx-auto pl-0 pr-4 sm:pl-0 sm:pr-6 lg:pl-0 lg:pr-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="text-xl font-bold text-primary">
               딸깍소싱
