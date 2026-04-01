@@ -213,3 +213,50 @@ export interface PaginatedResponse<T> {
   per_page: number;
   total_pages: number;
 }
+
+export interface Generated13SectionContent {
+  hero: {
+    headline_options: string[];
+    subheadline: string;
+    urgency_badge: string;
+    cta_text: string;
+  };
+  pain: {
+    intro: string;
+    pain_points: string[];
+    emotional_hook: string;
+  };
+  problem: {
+    hook: string;
+    reasons: string[];
+    reframe: string;
+  };
+  solution: {
+    intro: string;
+    one_liner: string;
+    target_fit: string;
+  };
+  how_it_works: {
+    steps: { title: string; description: string }[];
+  };
+  benefits: {
+    items: { title: string; description: string }[];
+  };
+  social_proof: {
+    headline: string;
+    stats: string[];
+    testimonials: { name: string; content: string; result: string }[];
+  };
+  target_filter: {
+    recommended: string[];
+    not_recommended: string[];
+  };
+  faq: { question: string; answer: string }[];
+  final_cta: {
+    headline: string;
+    urgency: string;
+    cta_text: string;
+    closing: string;
+  };
+  trust_text: string;
+}
