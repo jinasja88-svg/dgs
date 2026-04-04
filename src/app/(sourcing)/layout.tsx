@@ -1,9 +1,23 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Search, FileText, Heart, ClipboardList } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Search, FileText, Heart, ClipboardList, Clock, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatPrice } from '@/lib/utils';
+import { getRecentlyViewed } from '@/lib/recently-viewed';
+import type { RecentlyViewedItem } from '@/lib/recently-viewed';
+
+const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
+
+function proxyImg(url: string): string {
+  if (!url) return '';
+  if (url.includes('alicdn.com') || url.includes('1688.com/img')) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
 
 const sidebarItems = [
   { label: '아이템검색', href: '/shop', icon: Search },
@@ -18,12 +32,51 @@ export default function SourcingLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedItem[]>([]);
+
+  useEffect(() => {
+    try {
+      setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
+    } catch {}
+    setRecentlyViewed(getRecentlyViewed());
+
+    // 검색/상품 조회 시 갱신
+    const onStorage = () => {
+      try {
+        setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
+      } catch {}
+      setRecentlyViewed(getRecentlyViewed());
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('recent-updated', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('recent-updated', onStorage);
+    };
+  }, [pathname]);
+
+  const removeRecent = (term: string) => {
+    const next = recentSearches.filter((k) => k !== term);
+    setRecentSearches(next);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+  };
+
+  const clearAllRecent = () => {
+    setRecentSearches([]);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  };
+
+  const handleSearchClick = (term: string) => {
+    router.push(`/shop?keyword=${encodeURIComponent(term)}`);
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-64px)]">
       {/* Left Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 border-r border-border-light bg-white flex-shrink-0">
-        <nav className="flex-1 px-3 pt-6">
+      <aside className="hidden md:flex flex-col w-60 border-r border-border-light bg-white flex-shrink-0 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto">
+        <nav className="px-3 pt-6">
           {sidebarItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
@@ -43,6 +96,81 @@ export default function SourcingLayout({
             );
           })}
         </nav>
+
+        {/* 사이드바 하단: 최근 검색어 + 최근 본 상품 */}
+        <div className="mt-auto border-t border-border-light px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-64px-200px)]">
+          {/* 최근 검색어 */}
+          {recentSearches.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> 최근 검색어
+                </p>
+                <button onClick={clearAllRecent} className="text-[10px] text-text-tertiary hover:text-danger transition-colors">
+                  삭제
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentSearches.slice(0, 6).map((term) => (
+                  <span
+                    key={term}
+                    className="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 bg-surface border border-border-light rounded-full text-[11px] text-text-secondary"
+                  >
+                    <button
+                      onClick={() => handleSearchClick(term)}
+                      className="hover:text-primary transition-colors truncate max-w-[100px]"
+                    >
+                      {term}
+                    </button>
+                    <button
+                      onClick={() => removeRecent(term)}
+                      className="w-3.5 h-3.5 flex items-center justify-center hover:text-danger transition-colors flex-shrink-0"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 최근 본 상품 */}
+          {recentlyViewed.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 mb-2">
+                <History className="w-3 h-3" /> 최근 본 상품
+              </p>
+              <div className="space-y-2">
+                {recentlyViewed.slice(0, 5).map((item) => (
+                  <Link
+                    key={item.product_id}
+                    href={`/shop/${item.product_id}`}
+                    className="flex items-center gap-2 group"
+                  >
+                    <div className="w-10 h-10 bg-surface border border-border-light rounded-[var(--radius-sm)] overflow-hidden flex-shrink-0">
+                      {item.image ? (
+                        <img
+                          src={proxyImg(item.image)}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-text-secondary line-clamp-1 group-hover:text-primary transition-colors">
+                        {item.title}
+                      </p>
+                      <p className="text-[11px] font-semibold text-primary">{formatPrice(item.price_krw)}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* Mobile Bottom Nav */}

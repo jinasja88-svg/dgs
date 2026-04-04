@@ -3,7 +3,7 @@
 import { useState, use, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink, Star, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -317,7 +317,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             {displayProduct!.seller && (
               <div className="flex items-center gap-4 p-3 bg-surface rounded-[var(--radius-md)] mb-6 text-sm">
                 <span className="font-medium">{displayProduct!.seller.name}</span>
-                <span className="text-warning">★ {displayProduct!.seller.rating}</span>
+                {displayProduct!.seller.rating && <span className="text-warning">★ {displayProduct!.seller.rating}</span>}
                 {displayProduct!.seller.years && <span className="text-text-tertiary">{displayProduct!.seller.years}년</span>}
                 {displayProduct!.seller.location && <span className="text-text-tertiary">{displayProduct!.seller.location}</span>}
               </div>
@@ -423,8 +423,134 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         </div>
       </div>
 
+      {/* 1688 구매자 리뷰 */}
+      <RatingsSection productId={productId} />
+
       {/* 1688 상세 페이지 */}
       <DetailSection productId={productId} />
+    </div>
+  );
+}
+
+interface TranslatedRating {
+  content: string;
+  content_zh: string;
+  time: string;
+  star: number;
+  sku_info?: string;
+  images?: string[];
+  user_name?: string;
+}
+
+function RatingsSection({ productId }: { productId: string }) {
+  const [showAll, setShowAll] = useState(false);
+
+  const { data, isLoading } = useQuery<{ ratings: TranslatedRating[] }>({
+    queryKey: ['product-ratings', productId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sourcing/product/${productId}/ratings`);
+      return r.json();
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const ratings = data?.ratings || [];
+  if (!isLoading && ratings.length === 0) return null;
+
+  const displayedRatings = showAll ? ratings : ratings.slice(0, 3);
+  const avgStar = ratings.length
+    ? (ratings.reduce((sum, r) => sum + r.star, 0) / ratings.length).toFixed(1)
+    : '0';
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-text-secondary" />
+          <h2 className="text-base font-semibold text-text-primary">구매자 리뷰</h2>
+          {!isLoading && ratings.length > 0 && (
+            <span className="text-sm text-text-tertiary">
+              ({ratings.length}건 · <Star className="w-3 h-3 inline text-warning fill-warning" /> {avgStar})
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="border border-border-light rounded-[var(--radius-lg)] overflow-hidden bg-white">
+        {isLoading ? (
+          <div className="p-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y divide-border-light">
+            {displayedRatings.map((rating, i) => (
+              <div key={i} className="p-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex">
+                    {Array.from({ length: 5 }).map((_, si) => (
+                      <Star
+                        key={si}
+                        className={cn(
+                          'w-3.5 h-3.5',
+                          si < rating.star
+                            ? 'text-warning fill-warning'
+                            : 'text-border'
+                        )}
+                      />
+                    ))}
+                  </div>
+                  {rating.user_name && (
+                    <span className="text-xs text-text-tertiary">{rating.user_name}</span>
+                  )}
+                  {rating.time && (
+                    <span className="text-xs text-text-tertiary">{rating.time}</span>
+                  )}
+                </div>
+
+                <p className="text-sm text-text-primary leading-relaxed">{rating.content}</p>
+                {rating.content_zh && rating.content !== rating.content_zh && (
+                  <p className="text-xs text-text-tertiary mt-1">{rating.content_zh}</p>
+                )}
+
+                {rating.sku_info && (
+                  <span className="inline-block mt-1.5 px-2 py-0.5 bg-surface text-xs text-text-tertiary rounded-[var(--radius-sm)]">
+                    {rating.sku_info}
+                  </span>
+                )}
+
+                {rating.images && rating.images.length > 0 && (
+                  <div className="flex gap-2 mt-2 overflow-x-auto">
+                    {rating.images.map((img, imgIdx) => (
+                      <img
+                        key={imgIdx}
+                        src={proxyImg(img)}
+                        alt=""
+                        className="w-16 h-16 rounded-[var(--radius-sm)] object-cover flex-shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {ratings.length > 3 && (
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="w-full py-3 text-sm text-primary hover:bg-surface transition-colors"
+              >
+                {showAll ? '접기' : `리뷰 ${ratings.length}건 전체 보기`}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

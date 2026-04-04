@@ -57,9 +57,14 @@ export default function Header() {
           isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
         )}
       >
-        <div className="max-w-7xl mx-auto pl-0 pr-4 sm:pl-0 sm:pr-6 lg:pl-0 lg:pr-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="text-xl font-bold text-primary">
+            <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="28" height="28" rx="8" fill="#2563EB" />
+                <path d="M8 14.5L12.5 19L20 9.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="20" cy="8" r="3" fill="#60A5FA" />
+              </svg>
               딸깍소싱
             </Link>
 

@@ -135,6 +135,9 @@ export interface SourcingSeller {
   rating?: number;
   years?: number;
   location?: string;
+  is_super_factory?: boolean;
+  repurchase_rate?: number;
+  sales_90d?: number;
 }
 
 export interface SourcingOrder {

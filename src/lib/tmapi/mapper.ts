@@ -30,6 +30,13 @@ export function mapSearchItemToSourcingProduct(
       rating: item.shop_info?.score_info?.composite_score
         ? parseFloat(item.shop_info.score_info.composite_score)
         : undefined,
+      is_super_factory: item.shop_info?.is_super_factory || false,
+      repurchase_rate: item.item_repurchase_rate
+        ? parseFloat(item.item_repurchase_rate)
+        : undefined,
+      sales_90d: item.sale_info?.sale_quantity_90days
+        ? parseInt(item.sale_info.sale_quantity_90days)
+        : undefined,
     },
     stock: 0,
     min_order: parseInt(item.moq) || 1,

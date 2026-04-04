@@ -2,15 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Search, ImagePlus, Filter, X, Upload, Clock, Zap, History } from 'lucide-react';
+import { Search, ImagePlus, Filter, X, Upload, Zap, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import { formatPrice } from '@/lib/utils';
-import { getRecentlyViewed } from '@/lib/recently-viewed';
-import type { RecentlyViewedItem } from '@/lib/recently-viewed';
 import type { SourcingProduct, SourcingCategory, PaginatedResponse } from '@/types';
 
 function proxyImg(url: string): string {
@@ -23,6 +21,16 @@ function proxyImg(url: string): string {
 
 const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
 const MAX_RECENT = 8;
+
+type SortOption = 'recommend' | 'sales' | 'price_up' | 'price_down' | 'rating' | 'repurchase';
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'recommend', label: '추천순' },
+  { value: 'sales', label: '판매량순' },
+  { value: 'price_up', label: '낮은가격순' },
+  { value: 'price_down', label: '높은가격순' },
+  { value: 'rating', label: '평점순' },
+  { value: 'repurchase', label: '재구매율순' },
+];
 
 function saveRecentSearch(keyword: string) {
   if (!keyword.trim()) return;
@@ -42,19 +50,14 @@ export default function ShopPage() {
   const [isImageSearching, setIsImageSearching] = useState(false);
   const [imageResults, setImageResults] = useState<SourcingProduct[] | null>(null);
   const [similarSearchSource, setSimilarSearchSource] = useState<string | null>(null);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedItem[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('rating');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // 최근 검색어 & 사용자명 & 최근 본 상품 & 취향 카테고리 로드
+  // 사용자명 & 취향 카테고리 로드
   useEffect(() => {
-    try {
-      setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
-    } catch {}
-    setRecentlyViewed(getRecentlyViewed());
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
@@ -85,11 +88,12 @@ export default function ShopPage() {
     isFetchingNextPage,
     isLoading,
   } = useInfiniteQuery<PaginatedResponse<SourcingProduct>>({
-    queryKey: ['sourcing-search', keyword, selectedCategory],
+    queryKey: ['sourcing-search', keyword, selectedCategory, sortOption],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams();
       if (keyword) params.set('keyword', keyword);
       if (selectedCategory) params.set('category', selectedCategory);
+      params.set('sort', sortOption);
       params.set('page', String(pageParam));
       params.set('per_page', '20');
       return fetch(`/api/sourcing/search?${params}`).then((r) => r.json());
@@ -124,7 +128,7 @@ export default function ShopPage() {
     setKeyword(searchInput);
     if (searchInput.trim()) {
       saveRecentSearch(searchInput.trim());
-      setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
+      window.dispatchEvent(new Event('recent-updated'));
       // DB 동기화 (fire and forget)
       fetch('/api/sourcing/search-history', {
         method: 'POST',
@@ -132,32 +136,6 @@ export default function ShopPage() {
         body: JSON.stringify({ keyword: searchInput.trim() }),
       }).catch(() => {});
     }
-  };
-
-  const handleRecentClick = (term: string) => {
-    setSearchInput(term);
-    setImageResults(null);
-    setSimilarSearchSource(null);
-    setKeyword(term);
-  };
-
-  const removeRecent = (term: string) => {
-    const next = recentSearches.filter((k) => k !== term);
-    setRecentSearches(next);
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
-  };
-
-  const clearAllRecent = () => {
-    setRecentSearches([]);
-    localStorage.removeItem(RECENT_SEARCHES_KEY);
-  };
-
-  const handleCategoryClick = (catName: string) => {
-    setSelectedCategory(catName);
-    setImageResults(null);
-    setSimilarSearchSource(null);
-    setKeyword('');
-    setSearchInput('');
   };
 
   // Image URL 기반 검색 (돋보기 버튼 / URL 직접 입력)
@@ -366,90 +344,6 @@ export default function ShopPage() {
         )}
       </div>
 
-      {/* 인기 카테고리 빠른 진입 */}
-      {!hasResults && sortedCategories.length > 0 && (
-        <div className="mb-6">
-          <p className="text-xs font-medium text-text-tertiary mb-2 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5" /> 인기 카테고리
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {sortedCategories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => handleCategoryClick(cat.name)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border rounded-full text-xs font-medium transition-colors hover:bg-primary-5 hover:border-primary hover:text-primary ${
-                  preferredCategories.includes(cat.name)
-                    ? 'border-primary text-primary'
-                    : 'border-border text-text-secondary'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 최근 검색어 */}
-      {!hasResults && recentSearches.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> 최근 검색어
-            </p>
-            <button onClick={clearAllRecent} className="text-xs text-text-tertiary hover:text-danger transition-colors">
-              전체 삭제
-            </button>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {recentSearches.map((term) => (
-              <span key={term} className="flex items-center gap-1 pl-3 pr-1.5 py-1 bg-white border border-border rounded-full text-xs text-text-secondary">
-                <button onClick={() => handleRecentClick(term)} className="hover:text-primary transition-colors">
-                  {term}
-                </button>
-                <button onClick={() => removeRecent(term)} className="w-4 h-4 flex items-center justify-center hover:text-danger transition-colors">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 최근 본 상품 */}
-      {!hasResults && recentlyViewed.length > 0 && (
-        <div className="mb-6">
-          <p className="text-xs font-medium text-text-tertiary mb-2 flex items-center gap-1">
-            <History className="w-3.5 h-3.5" /> 최근 본 상품
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {recentlyViewed.map((item) => (
-              <Link
-                key={item.product_id}
-                href={`/shop/${item.product_id}`}
-                className="flex-shrink-0 w-28 group"
-              >
-                <div className="w-28 h-28 bg-white border border-border-light rounded-[var(--radius-md)] overflow-hidden mb-1.5">
-                  {item.image ? (
-                    <img
-                      src={proxyImg(item.image)}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
-                  )}
-                </div>
-                <p className="text-xs text-text-secondary line-clamp-2 group-hover:text-primary transition-colors">{item.title}</p>
-                <p className="text-xs font-semibold text-primary mt-0.5">{formatPrice(item.price_krw)}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Similar Search Source Banner */}
       {similarSearchSource && imageResults && (
         <div className="flex items-center gap-3 bg-white border border-border-light rounded-[var(--radius-lg)] p-3 mb-6">
@@ -487,6 +381,26 @@ export default function ShopPage() {
               }`}
             >
               {cat.icon} {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Sort Options */}
+      {!imageResults && (
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+          <ArrowUpDown className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setSortOption(opt.value)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                sortOption === opt.value
+                  ? 'bg-primary text-white'
+                  : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
+              }`}
+            >
+              {opt.label}
             </button>
           ))}
         </div>
@@ -581,9 +495,15 @@ export default function ShopPage() {
                         <span className="text-xs text-text-tertiary">¥{product.price_cny}</span>
                       </div>
                       {product.seller && (
-                        <div className="flex items-center gap-1 mt-1.5">
+                        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                           <span className="text-xs text-text-tertiary truncate">{product.seller.name}</span>
-                          <span className="text-xs text-warning">★ {product.seller.rating}</span>
+                          {product.seller.is_super_factory && (
+                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-medium">실력공장</span>
+                          )}
+                          {product.seller.rating && <span className="text-xs text-warning">★ {product.seller.rating}</span>}
+                          {product.seller.repurchase_rate != null && product.seller.repurchase_rate > 0 && (
+                            <span className="text-[10px] text-green-600">재구매 {product.seller.repurchase_rate}%</span>
+                          )}
                         </div>
                       )}
                       {product.min_order && product.min_order > 1 && (
