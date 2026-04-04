@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Search, FileText, Heart, ClipboardList, Clock, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/utils';
-import { getRecentlyViewed } from '@/lib/recently-viewed';
+import { getRecentlyViewed, clearRecentlyViewed } from '@/lib/recently-viewed';
 import type { RecentlyViewedItem } from '@/lib/recently-viewed';
 
 const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
@@ -137,11 +137,22 @@ export default function SourcingLayout({
           {/* 최근 본 상품 */}
           {recentlyViewed.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1 mb-2">
-                <History className="w-3 h-3" /> 최근 본 상품
-              </p>
-              <div className="space-y-2">
-                {recentlyViewed.slice(0, 5).map((item) => (
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1">
+                  <History className="w-3 h-3" /> 최근 본 상품
+                </p>
+                <button
+                  onClick={() => {
+                    clearRecentlyViewed();
+                    setRecentlyViewed([]);
+                  }}
+                  className="text-[10px] text-text-tertiary hover:text-danger transition-colors"
+                >
+                  삭제
+                </button>
+              </div>
+              <div className="space-y-2 max-h-[210px] overflow-y-auto">
+                {recentlyViewed.map((item) => (
                   <Link
                     key={item.product_id}
                     href={`/shop/${item.product_id}`}

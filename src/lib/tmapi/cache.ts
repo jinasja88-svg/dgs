@@ -47,4 +47,5 @@ export const CACHE_TTL = {
   SEARCH: 5 * 60 * 1000,       // 5 minutes
   DETAIL: 15 * 60 * 1000,      // 15 minutes
   IMAGE_SEARCH: 10 * 60 * 1000, // 10 minutes
+  RATINGS: 30 * 60 * 1000,      // 30 minutes
 } as const;

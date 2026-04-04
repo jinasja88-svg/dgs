@@ -1,6 +1,6 @@
 import { createAdminClient } from './supabase-admin';
 
-type Endpoint = 'search' | 'image-search' | 'product' | 'detail-generate';
+type Endpoint = 'search' | 'image-search' | 'product' | 'detail-generate' | 'ratings';
 
 /**
  * 1688 API 호출을 실행하고 결과를 api_call_logs 테이블에 기록한다.

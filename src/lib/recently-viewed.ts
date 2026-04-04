@@ -24,3 +24,8 @@ export function addRecentlyViewed(item: Omit<RecentlyViewedItem, 'visited_at'>):
   if (list.length > MAX) list.length = MAX;
   localStorage.setItem(KEY, JSON.stringify(list));
 }
+
+export function clearRecentlyViewed(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(KEY);
+}

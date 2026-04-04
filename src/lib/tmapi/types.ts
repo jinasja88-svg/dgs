@@ -143,6 +143,22 @@ export interface TmapiImageSearchItem {
   };
 }
 
+// ─── Item Ratings ───
+
+export interface TmapiItemRatingsResult {
+  item_id: number;
+  ratings: TmapiRating[];
+}
+
+export interface TmapiRating {
+  content: string;
+  time: string;
+  star: number;
+  sku_info?: string;
+  images?: string[];
+  user_name?: string;
+}
+
 // ─── Search Params ───
 
 export interface TmapiSearchParams {

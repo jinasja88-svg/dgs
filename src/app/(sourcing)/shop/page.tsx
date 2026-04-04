@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Search, ImagePlus, Filter, X, Upload, Zap, ArrowUpDown } from 'lucide-react';
+import { Search, ImagePlus, Filter, X, Upload, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase';
@@ -50,7 +50,6 @@ export default function ShopPage() {
   const [isImageSearching, setIsImageSearching] = useState(false);
   const [imageResults, setImageResults] = useState<SourcingProduct[] | null>(null);
   const [similarSearchSource, setSimilarSearchSource] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
   const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('rating');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,11 +62,10 @@ export default function ShopPage() {
       if (data.user) {
         supabase
           .from('profiles')
-          .select('name, preferred_categories')
+          .select('preferred_categories')
           .eq('id', data.user.id)
           .single()
           .then(({ data: profile }) => {
-            if (profile?.name) setUserName(profile.name);
             if (profile?.preferred_categories?.length) {
               setPreferredCategories(profile.preferred_categories);
             }
@@ -220,8 +218,6 @@ export default function ShopPage() {
   const displayProducts = imageResults || infiniteData?.pages.flatMap((p) => p.data) || [];
   const totalCount = infiniteData?.pages[0]?.total ?? 0;
 
-  const hasResults = !!(keyword || selectedCategory || imageResults);
-
   // 취향 카테고리를 앞으로 정렬
   const sortedCategories = categories
     ? [
@@ -232,22 +228,7 @@ export default function ShopPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      {/* 환영 배너 */}
-      {!hasResults && (
-        <div className="bg-primary-5 border border-primary/20 rounded-[var(--radius-lg)] px-6 py-5 mb-6 flex items-center gap-4">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Zap className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <p className="font-semibold text-primary">
-              {userName ? `${userName}님, 오늘도 소싱 시작해볼까요?` : '1688 소싱, 딸깍 한 번으로'}
-            </p>
-            <p className="text-sm text-primary/70 mt-0.5">키워드 또는 이미지로 중국 도매 상품을 검색하세요</p>
-          </div>
-        </div>
-      )}
-
-      {/* Page Title */}
+{/* Page Title */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">아이템 검색</h1>
         <p className="text-sm text-text-tertiary mt-1">1688에서 원하는 상품을 키워드 또는 이미지로 검색하세요</p>

@@ -4,6 +4,7 @@ import type {
   TmapiSearchResult,
   TmapiItemDetail,
   TmapiImageSearchResult,
+  TmapiItemRatingsResult,
   TmapiSearchParams,
   TmapiImageSearchParams,
 } from './types';
@@ -82,6 +83,12 @@ export class TmapiClient {
     return this.request<TmapiItemDetail>('/1688/item_detail', {
       item_id: itemId,
       language: language || 'ko',
+    });
+  }
+
+  async getItemRatings(itemId: string): Promise<TmapiItemRatingsResult> {
+    return this.request<TmapiItemRatingsResult>('/1688/item_ratings', {
+      item_id: itemId,
     });
   }
 
