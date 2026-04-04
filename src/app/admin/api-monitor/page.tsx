@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Activity, Clock, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
 
 type Period = 'today' | '7d' | '30d';
 
@@ -33,7 +32,6 @@ export default function ApiMonitorPage() {
   const [period, setPeriod] = useState<Period>('today');
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClient();
 
   const getStartDate = (p: Period): string => {
     const d = new Date();
@@ -45,13 +43,10 @@ export default function ApiMonitorPage() {
 
   const load = async (p: Period) => {
     setIsLoading(true);
-    const { data } = await supabase
-      .from('api_call_logs')
-      .select('endpoint, duration_ms, success, error_msg, created_at')
-      .gte('created_at', getStartDate(p))
-      .order('created_at', { ascending: false })
-      .limit(500);
-    setLogs((data || []) as Log[]);
+    const since = getStartDate(p);
+    const res = await fetch(`/api/admin/api-logs?since=${encodeURIComponent(since)}`);
+    const json = await res.json();
+    setLogs((json.data || []) as Log[]);
     setIsLoading(false);
   };
 
