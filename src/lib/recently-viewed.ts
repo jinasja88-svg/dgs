@@ -23,6 +23,7 @@ export function addRecentlyViewed(item: Omit<RecentlyViewedItem, 'visited_at'>):
   list.unshift({ ...item, visited_at: new Date().toISOString() });
   if (list.length > MAX) list.length = MAX;
   localStorage.setItem(KEY, JSON.stringify(list));
+  window.dispatchEvent(new Event('recent-updated'));
 }
 
 export function clearRecentlyViewed(): void {
