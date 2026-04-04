@@ -86,9 +86,10 @@ export class TmapiClient {
     });
   }
 
-  async getItemRatings(itemId: string): Promise<TmapiItemRatingsResult> {
-    return this.request<TmapiItemRatingsResult>('/1688/item_ratings', {
+  async getItemRatings(itemId: string, page = 1): Promise<TmapiItemRatingsResult> {
+    return this.request<TmapiItemRatingsResult>('/1688/item/rating', {
       item_id: itemId,
+      page: String(page),
     });
   }
 

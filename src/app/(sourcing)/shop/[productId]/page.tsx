@@ -442,10 +442,19 @@ interface TranslatedRating {
   user_name?: string;
 }
 
-function RatingsSection({ productId }: { productId: string }) {
-  const [showAll, setShowAll] = useState(false);
+interface SiteReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
 
-  const { data, isLoading } = useQuery<{ ratings: TranslatedRating[] }>({
+function RatingsSection({ productId }: { productId: string }) {
+  const [activeTab, setActiveTab] = useState<'1688' | 'site'>('1688');
+  const [showAll1688, setShowAll1688] = useState(false);
+  const [showAllSite, setShowAllSite] = useState(false);
+
+  const { data: ratingsData, isLoading: isLoading1688 } = useQuery<{ ratings: TranslatedRating[] }>({
     queryKey: ['product-ratings', productId],
     queryFn: async () => {
       const r = await fetch(`/api/sourcing/product/${productId}/ratings`);
@@ -454,29 +463,84 @@ function RatingsSection({ productId }: { productId: string }) {
     staleTime: 30 * 60 * 1000,
   });
 
-  const ratings = data?.ratings || [];
-  if (!isLoading && ratings.length === 0) return null;
+  const { data: siteData, isLoading: isLoadingSite } = useQuery<{ reviews: SiteReview[] }>({
+    queryKey: ['product-site-reviews', productId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sourcing/product/${productId}/site-reviews`);
+      return r.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const displayedRatings = showAll ? ratings : ratings.slice(0, 3);
-  const avgStar = ratings.length
+  const ratings = ratingsData?.ratings || [];
+  const siteReviews = siteData?.reviews || [];
+
+  const isLoading = activeTab === '1688' ? isLoading1688 : isLoadingSite;
+
+  if (!isLoading1688 && !isLoadingSite && ratings.length === 0 && siteReviews.length === 0) return null;
+
+  const avg1688 = ratings.length
     ? (ratings.reduce((sum, r) => sum + r.star, 0) / ratings.length).toFixed(1)
-    : '0';
+    : null;
+  const avgSite = siteReviews.length
+    ? (siteReviews.reduce((sum, r) => sum + r.rating, 0) / siteReviews.length).toFixed(1)
+    : null;
+
+  const displayed1688 = showAll1688 ? ratings : ratings.slice(0, 3);
+  const displayedSite = showAllSite ? siteReviews : siteReviews.slice(0, 3);
 
   return (
     <div className="mt-8">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-text-secondary" />
-          <h2 className="text-base font-semibold text-text-primary">구매자 리뷰</h2>
-          {!isLoading && ratings.length > 0 && (
-            <span className="text-sm text-text-tertiary">
-              ({ratings.length}건 · <Star className="w-3 h-3 inline text-warning fill-warning" /> {avgStar})
-            </span>
-          )}
-        </div>
+      <div className="flex items-center gap-2 mb-3">
+        <MessageSquare className="w-4 h-4 text-text-secondary" />
+        <h2 className="text-base font-semibold text-text-primary">구매자 리뷰</h2>
       </div>
 
-      <div className="border border-border-light rounded-[var(--radius-lg)] overflow-hidden bg-white">
+      {/* 탭 */}
+      <div className="flex border-b border-border-light mb-0">
+        <button
+          onClick={() => setActiveTab('1688')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+            activeTab === '1688'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          )}
+        >
+          <span>🇨🇳</span>
+          <span>1688 리뷰</span>
+          {!isLoading1688 && ratings.length > 0 && (
+            <span className={cn(
+              'text-xs px-1.5 py-0.5 rounded-full',
+              activeTab === '1688' ? 'bg-primary/10 text-primary' : 'bg-surface text-text-tertiary'
+            )}>
+              {ratings.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('site')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+            activeTab === 'site'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          )}
+        >
+          <span>🇰🇷</span>
+          <span>딸깍소싱 리뷰</span>
+          {!isLoadingSite && siteReviews.length > 0 && (
+            <span className={cn(
+              'text-xs px-1.5 py-0.5 rounded-full',
+              activeTab === 'site' ? 'bg-primary/10 text-primary' : 'bg-surface text-text-tertiary'
+            )}>
+              {siteReviews.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="border border-t-0 border-border-light rounded-b-[var(--radius-lg)] overflow-hidden bg-white">
         {isLoading ? (
           <div className="p-6 space-y-4">
             {[1, 2, 3].map((i) => (
@@ -487,68 +551,118 @@ function RatingsSection({ productId }: { productId: string }) {
               </div>
             ))}
           </div>
-        ) : (
-          <div className="divide-y divide-border-light">
-            {displayedRatings.map((rating, i) => (
-              <div key={i} className="p-4">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="flex">
-                    {Array.from({ length: 5 }).map((_, si) => (
-                      <Star
-                        key={si}
-                        className={cn(
-                          'w-3.5 h-3.5',
-                          si < rating.star
-                            ? 'text-warning fill-warning'
-                            : 'text-border'
-                        )}
-                      />
-                    ))}
+        ) : activeTab === '1688' ? (
+          ratings.length === 0 ? (
+            <p className="p-6 text-sm text-text-tertiary text-center">1688 리뷰가 없습니다.</p>
+          ) : (
+            <div className="divide-y divide-border-light">
+              {avg1688 && (
+                <div className="px-4 py-3 flex items-center gap-1.5 bg-surface/50">
+                  <Star className="w-4 h-4 text-warning fill-warning" />
+                  <span className="text-sm font-semibold text-text-primary">{avg1688}</span>
+                  <span className="text-xs text-text-tertiary">/ 5.0 · {ratings.length}건</span>
+                </div>
+              )}
+              {displayed1688.map((rating, i) => (
+                <div key={i} className="p-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex">
+                      {Array.from({ length: 5 }).map((_, si) => (
+                        <Star
+                          key={si}
+                          className={cn(
+                            'w-3.5 h-3.5',
+                            si < rating.star ? 'text-warning fill-warning' : 'text-border'
+                          )}
+                        />
+                      ))}
+                    </div>
+                    {rating.user_name && (
+                      <span className="text-xs text-text-tertiary">{rating.user_name}</span>
+                    )}
+                    {rating.time && (
+                      <span className="text-xs text-text-tertiary">{rating.time.slice(0, 10)}</span>
+                    )}
                   </div>
-                  {rating.user_name && (
-                    <span className="text-xs text-text-tertiary">{rating.user_name}</span>
+                  <p className="text-sm text-text-primary leading-relaxed">{rating.content}</p>
+                  {rating.content_zh && rating.content !== rating.content_zh && (
+                    <p className="text-xs text-text-tertiary mt-1">{rating.content_zh}</p>
                   )}
-                  {rating.time && (
-                    <span className="text-xs text-text-tertiary">{rating.time}</span>
+                  {rating.sku_info && (
+                    <span className="inline-block mt-1.5 px-2 py-0.5 bg-surface text-xs text-text-tertiary rounded-[var(--radius-sm)]">
+                      {rating.sku_info}
+                    </span>
+                  )}
+                  {rating.images && rating.images.length > 0 && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto">
+                      {rating.images.map((img, imgIdx) => (
+                        <img
+                          key={imgIdx}
+                          src={proxyImg(img)}
+                          alt=""
+                          className="w-16 h-16 rounded-[var(--radius-sm)] object-cover flex-shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
-
-                <p className="text-sm text-text-primary leading-relaxed">{rating.content}</p>
-                {rating.content_zh && rating.content !== rating.content_zh && (
-                  <p className="text-xs text-text-tertiary mt-1">{rating.content_zh}</p>
-                )}
-
-                {rating.sku_info && (
-                  <span className="inline-block mt-1.5 px-2 py-0.5 bg-surface text-xs text-text-tertiary rounded-[var(--radius-sm)]">
-                    {rating.sku_info}
-                  </span>
-                )}
-
-                {rating.images && rating.images.length > 0 && (
-                  <div className="flex gap-2 mt-2 overflow-x-auto">
-                    {rating.images.map((img, imgIdx) => (
-                      <img
-                        key={imgIdx}
-                        src={proxyImg(img)}
-                        alt=""
-                        className="w-16 h-16 rounded-[var(--radius-sm)] object-cover flex-shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                    ))}
+              ))}
+              {ratings.length > 3 && (
+                <button
+                  onClick={() => setShowAll1688(!showAll1688)}
+                  className="w-full py-3 text-sm text-primary hover:bg-surface transition-colors"
+                >
+                  {showAll1688 ? '접기' : `리뷰 ${ratings.length}건 전체 보기`}
+                </button>
+              )}
+            </div>
+          )
+        ) : (
+          siteReviews.length === 0 ? (
+            <p className="p-6 text-sm text-text-tertiary text-center">딸깍소싱 리뷰가 없습니다.</p>
+          ) : (
+            <div className="divide-y divide-border-light">
+              {avgSite && (
+                <div className="px-4 py-3 flex items-center gap-1.5 bg-surface/50">
+                  <Star className="w-4 h-4 text-warning fill-warning" />
+                  <span className="text-sm font-semibold text-text-primary">{avgSite}</span>
+                  <span className="text-xs text-text-tertiary">/ 5.0 · {siteReviews.length}건</span>
+                </div>
+              )}
+              {displayedSite.map((review) => (
+                <div key={review.id} className="p-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex">
+                      {Array.from({ length: 5 }).map((_, si) => (
+                        <Star
+                          key={si}
+                          className={cn(
+                            'w-3.5 h-3.5',
+                            si < review.rating ? 'text-warning fill-warning' : 'text-border'
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-text-tertiary">
+                      {new Date(review.created_at).toLocaleDateString('ko-KR')}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
-
-            {ratings.length > 3 && (
-              <button
-                onClick={() => setShowAll(!showAll)}
-                className="w-full py-3 text-sm text-primary hover:bg-surface transition-colors"
-              >
-                {showAll ? '접기' : `리뷰 ${ratings.length}건 전체 보기`}
-              </button>
-            )}
-          </div>
+                  {review.comment && (
+                    <p className="text-sm text-text-primary leading-relaxed">{review.comment}</p>
+                  )}
+                </div>
+              ))}
+              {siteReviews.length > 3 && (
+                <button
+                  onClick={() => setShowAllSite(!showAllSite)}
+                  className="w-full py-3 text-sm text-primary hover:bg-surface transition-colors"
+                >
+                  {showAllSite ? '접기' : `리뷰 ${siteReviews.length}건 전체 보기`}
+                </button>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>

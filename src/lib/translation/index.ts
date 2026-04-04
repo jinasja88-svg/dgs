@@ -27,6 +27,11 @@ async function zhToKoCached(text: string): Promise<string> {
   return translated;
 }
 
+// 단일 텍스트 중국어→한국어 번역 (외부 노출용)
+export async function translateSingle(text: string): Promise<string> {
+  return zhToKoCached(text);
+}
+
 // 한국어→중국어 번역 (검색 쿼리용)
 export async function translateSearchQuery(keyword: string): Promise<string> {
   if (!keyword || !containsKorean(keyword)) return keyword;

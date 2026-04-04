@@ -147,16 +147,19 @@ export interface TmapiImageSearchItem {
 
 export interface TmapiItemRatingsResult {
   item_id: number;
-  ratings: TmapiRating[];
+  page: number;
+  page_size: number;
+  list: TmapiRating[];
 }
 
 export interface TmapiRating {
-  content: string;
-  time: string;
-  star: number;
-  sku_info?: string;
+  id: string;
+  feedback: string;
+  rate_star: string;
+  feedback_date: string;
+  sku_map?: string;
   images?: string[];
-  user_name?: string;
+  user_nick?: string;
 }
 
 // ─── Search Params ───
