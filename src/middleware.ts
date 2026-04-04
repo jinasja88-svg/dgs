@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { updateSession } from '@/lib/supabase-middleware';
 
 const protectedRoutes = ['/mypage', '/checkout', '/sourcing-orders'];
@@ -18,13 +19,22 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Admin routes - check email whitelist
+  // Admin routes - check DB role
   if (pathname.startsWith('/admin')) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim());
-    if (!adminEmails.includes(user.email || '')) {
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile?.role !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }

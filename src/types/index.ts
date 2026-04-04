@@ -4,6 +4,7 @@ export interface Profile {
   name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  role: 'user' | 'admin';
   subscription_plan: 'free' | 'basic' | 'pro';
   subscription_expires_at: string | null;
   preferred_categories?: string[];
@@ -206,6 +207,57 @@ export interface SourcingReview {
   user_id: string;
   rating: number;
   comment: string | null;
+  created_at: string;
+}
+
+// CS (Customer Service) types
+export type CSInquiryCategory = 'order' | 'shipping' | 'return' | 'product' | 'payment' | 'other';
+export type CSInquiryStatus   = 'open' | 'in_progress' | 'answered' | 'closed';
+export type CSReturnType      = 'return' | 'exchange';
+export type CSReturnReason    = 'defective' | 'wrong_item' | 'not_as_described' | 'changed_mind' | 'other';
+export type CSReturnStatus    = 'requested' | 'reviewing' | 'approved' | 'rejected' | 'completed';
+
+export interface CSInquiry {
+  id: string;
+  user_id: string;
+  order_id?: string | null;
+  category: CSInquiryCategory;
+  title: string;
+  content: string;
+  status: CSInquiryStatus;
+  admin_reply?: string | null;
+  admin_replied_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined fields
+  profile?: Pick<Profile, 'id' | 'name' | 'email'>;
+  order?: Pick<SourcingOrder, 'id' | 'order_number'>;
+}
+
+export interface CSReturn {
+  id: string;
+  user_id: string;
+  order_id: string;
+  return_type: CSReturnType;
+  reason: CSReturnReason;
+  detail: string;
+  status: CSReturnStatus;
+  refund_amount?: number | null;
+  admin_note?: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined fields
+  profile?: Pick<Profile, 'id' | 'name' | 'email'>;
+  order?: Pick<SourcingOrder, 'id' | 'order_number'>;
+}
+
+export interface CSFAQ {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  is_published: boolean;
+  sort_order: number;
   created_at: string;
 }
 

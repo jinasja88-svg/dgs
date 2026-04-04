@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Package, ShoppingBag, User, Star } from 'lucide-react';
+import { MessageCircle, Package, RotateCcw, Settings, ShoppingBag, User, Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import Badge from '@/components/ui/Badge';
 import Skeleton from '@/components/ui/Skeleton';
@@ -72,12 +72,23 @@ export default function MyPage() {
           <h2 className="font-semibold text-text-primary">{profile?.name || '사용자'}</h2>
           <p className="text-sm text-text-tertiary">{profile?.email}</p>
         </div>
-        <Link
-          href="/mypage/profile"
-          className="text-sm text-primary hover:underline"
-        >
-          프로필 수정
-        </Link>
+        <div className="flex items-center gap-3">
+          {profile?.role === 'admin' && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-1.5 text-sm font-medium text-white bg-primary px-3 py-1.5 rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              관리자 페이지
+            </Link>
+          )}
+          <Link
+            href="/mypage/profile"
+            className="text-sm text-primary hover:underline"
+          >
+            프로필 수정
+          </Link>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -106,6 +117,8 @@ export default function MyPage() {
           { label: '찜목록', href: '/wishlist' },
           { label: '리뷰 관리', href: '/mypage/reviews' },
           { label: '프로필 설정', href: '/mypage/profile' },
+          { label: '1:1 문의', href: '/mypage/inquiries' },
+          { label: '반품/교환', href: '/mypage/returns' },
         ].map((link) => (
           <Link
             key={link.href}

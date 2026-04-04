@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, LayoutDashboard, Package, ShoppingBag, Users } from 'lucide-react';
+import { Activity, LayoutDashboard, MessageCircle, Package, ShoppingBag, Users, BarChart3, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 
@@ -12,6 +12,13 @@ const adminNavItems = [
   { label: '일반 주문', href: '/admin/orders', icon: ShoppingBag },
   { label: '사용자', href: '/admin/users', icon: Users },
   { label: 'API 모니터', href: '/admin/api-monitor', icon: Activity },
+];
+
+// 데스크톱 사이드바 전용 항목 (모바일 하단 탭에는 표시 안 함)
+const adminSidebarOnlyItems = [
+  { label: 'CS 관리', href: '/admin/cs', icon: MessageCircle },
+  { label: '정산', href: '/admin/settlement', icon: BarChart3 },
+  { label: '공지 관리', href: '/admin/notices', icon: Bell },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -25,6 +32,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
         <nav className="py-2">
           {adminNavItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
+                pathname === item.href
+                  ? 'bg-primary-5 text-primary font-medium'
+                  : 'text-text-secondary hover:bg-surface'
+              )}
+            >
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </Link>
+          ))}
+          <div className="my-2 mx-4 border-t border-border-light" />
+          {adminSidebarOnlyItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

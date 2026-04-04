@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Package, Users, TrendingUp, Clock, Activity, AlertCircle, ChevronRight } from 'lucide-react';
+import { Package, Users, TrendingUp, Clock, Activity, MessageCircle, RotateCcw, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -28,6 +28,8 @@ interface Stats {
   monthRevenue: number;
   pendingOrders: number;
   totalUsers: number;
+  openInquiries: number;
+  requestedReturns: number;
 }
 
 interface StatusCount {
@@ -43,7 +45,7 @@ interface ApiSummary {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<Stats>({ totalSourcingOrders: 0, monthRevenue: 0, pendingOrders: 0, totalUsers: 0 });
+  const [stats, setStats] = useState<Stats>({ totalSourcingOrders: 0, monthRevenue: 0, pendingOrders: 0, totalUsers: 0, openInquiries: 0, requestedReturns: 0 });
   const [statusCounts, setStatusCounts] = useState<StatusCount[]>([]);
   const [recentOrders, setRecentOrders] = useState<SourcingOrder[]>([]);
   const [apiSummary, setApiSummary] = useState<ApiSummary>({ total: 0, errorCount: 0, avgMs: 0, byEndpoint: [] });
@@ -62,7 +64,7 @@ export default function AdminDashboard() {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
-    const [usersRes, totalRes, pendingRes, recentRes, monthRes, allStatusRes] = await Promise.all([
+    const [usersRes, totalRes, pendingRes, recentRes, monthRes, allStatusRes, openInqRes, reqRetRes] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase.from('sourcing_orders').select('id', { count: 'exact', head: true }),
       supabase.from('sourcing_orders').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -72,12 +74,21 @@ export default function AdminDashboard() {
         .gte('created_at', monthStart.toISOString())
         .neq('status', 'cancelled'),
       supabase.from('sourcing_orders').select('status'),
+      supabase.from('cs_inquiries').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('cs_returns').select('id', { count: 'exact', head: true }).eq('status', 'requested'),
     ]);
 
     const monthRevenue = (monthRes.data || []).reduce(
       (sum, o) => sum + (o.total_krw || 0) + (o.service_fee || 0) + (o.shipping_fee || 0), 0
     );
-    setStats({ totalSourcingOrders: totalRes.count || 0, monthRevenue, pendingOrders: pendingRes.count || 0, totalUsers: usersRes.count || 0 });
+    setStats({
+      totalSourcingOrders: totalRes.count || 0,
+      monthRevenue,
+      pendingOrders: pendingRes.count || 0,
+      totalUsers: usersRes.count || 0,
+      openInquiries: openInqRes.count || 0,
+      requestedReturns: reqRetRes.count || 0,
+    });
     setRecentOrders((recentRes.data || []) as SourcingOrder[]);
 
     const counts: Record<string, number> = {};
@@ -127,12 +138,14 @@ export default function AdminDashboard() {
       <h1 className="text-2xl font-bold text-text-primary">관리자 대시보드</h1>
 
       {/* KPI 카드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           { icon: Package, label: '총 소싱 주문', value: `${stats.totalSourcingOrders}건`, color: 'text-primary bg-primary-5' },
           { icon: TrendingUp, label: '이번달 매출', value: formatPrice(stats.monthRevenue), color: 'text-success bg-success/10' },
           { icon: Clock, label: '대기중 주문', value: `${stats.pendingOrders}건`, color: 'text-warning bg-warning/10' },
           { icon: Users, label: '총 회원', value: `${stats.totalUsers}명`, color: 'text-secondary bg-secondary/10' },
+          { icon: MessageCircle, label: '미답변 문의', value: `${stats.openInquiries}건`, color: 'text-info bg-info-5', href: '/admin/cs' },
+          { icon: RotateCcw, label: '처리중 반품', value: `${stats.requestedReturns}건`, color: 'text-danger bg-danger-5', href: '/admin/cs' },
         ].map((card) => (
           <div key={card.label} className="bg-white rounded-[var(--radius-lg)] p-5 shadow-card">
             <div className="flex items-center gap-2 mb-3">

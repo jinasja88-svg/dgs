@@ -7,13 +7,15 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
-import { formatPrice, formatDate } from '@/lib/utils';
+import { formatPrice, formatDate, getSourcingStatusLabel } from '@/lib/utils';
 import type { SourcingOrder, SourcingOrderStatus } from '@/types';
 
 const STATUS_OPTIONS: SourcingOrderStatus[] = ['pending', 'paid', 'purchasing', 'shipping', 'delivered', 'cancelled'];
 
 export default function AdminSourcingOrdersPage() {
   const [orders, setOrders] = useState<SourcingOrder[]>([]);
+  const [filterStatus, setFilterStatus] = useState<SourcingOrderStatus | ''>('');
+  const [searchOrderNumber, setSearchOrderNumber] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<SourcingOrder | null>(null);
   const [newStatus, setNewStatus] = useState<SourcingOrderStatus>('pending');
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -22,14 +24,16 @@ export default function AdminSourcingOrdersPage() {
   const supabase = createClient();
 
   const loadOrders = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('sourcing_orders')
       .select('*')
       .order('created_at', { ascending: false });
+    if (filterStatus) query = query.eq('status', filterStatus);
+    const { data } = await query;
     if (data) setOrders(data as SourcingOrder[]);
   };
 
-  useEffect(() => { loadOrders(); }, []);
+  useEffect(() => { loadOrders(); }, [filterStatus]);
 
   const openEditModal = (order: SourcingOrder) => {
     setSelectedOrder(order);
@@ -61,11 +65,37 @@ export default function AdminSourcingOrdersPage() {
     setIsUpdating(false);
   };
 
+  const filteredOrders = orders.filter((o) =>
+    !searchOrderNumber || o.order_number.toLowerCase().includes(searchOrderNumber.toLowerCase())
+  );
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-text-primary mb-6">소싱 주문 관리</h1>
 
-      {!orders.length ? (
+      {/* 필터 영역 */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as SourcingOrderStatus | '')}
+          className="px-3 py-2 border border-border rounded-[var(--radius-md)] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+        >
+          <option value="">전체 상태</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>{getSourcingStatusLabel(s)}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={searchOrderNumber}
+          onChange={(e) => setSearchOrderNumber(e.target.value)}
+          placeholder="주문번호 검색"
+          className="px-3 py-2 border border-border rounded-[var(--radius-md)] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+        />
+        <span className="text-sm text-text-tertiary self-center">{filteredOrders.length}건</span>
+      </div>
+
+      {!filteredOrders.length ? (
         <p className="text-text-tertiary text-center py-12">주문이 없습니다.</p>
       ) : (
         <div className="bg-white rounded-[var(--radius-lg)] shadow-card overflow-hidden">
@@ -82,7 +112,7 @@ export default function AdminSourcingOrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-light">
-                {orders.map((order) => (
+                {filteredOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-surface/50">
                     <td className="px-4 py-3 font-medium">{order.order_number}</td>
                     <td className="px-4 py-3"><Badge status={order.status} /></td>

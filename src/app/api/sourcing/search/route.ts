@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 캐시 확인
-  const tmapiSort = isDefaultSearch ? 'sales' : getTmapiSort(sort);
+  const tmapiSort = (isDefaultSearch && sort === 'recommend') ? 'sales' : getTmapiSort(sort);
   const cacheKey = `search:${searchKeyword}:${page}:${perPage}:${sort}:${tmapiSort}`;
   const cached = tmapiCache.get<unknown>(cacheKey);
   if (cached) {
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     );
 
     // 후처리 정렬 적용
-    applyPostSort(products, isDefaultSearch ? 'recommend' : sort);
+    applyPostSort(products, sort);
 
     if (category) {
       for (const p of products) {

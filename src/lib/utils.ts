@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import type { SourcingOrderStatus } from '@/types';
+import type { SourcingOrderStatus, CSInquiryStatus, CSInquiryCategory, CSReturnStatus, CSReturnReason, CSReturnType } from '@/types';
 
 export function formatPrice(price: number): string {
   return `₩${price.toLocaleString('ko-KR')}`;
@@ -63,4 +63,52 @@ export function getPlanLabel(plan: string): string {
 export function truncate(text: string, length: number): string {
   if (text.length <= length) return text;
   return text.slice(0, length) + '...';
+}
+
+export function getCSInquiryStatusLabel(status: CSInquiryStatus): string {
+  const labels: Record<CSInquiryStatus, string> = {
+    open: '접수됨',
+    in_progress: '처리중',
+    answered: '답변 완료',
+    closed: '종료',
+  };
+  return labels[status] || status;
+}
+
+export function getCSReturnStatusLabel(status: CSReturnStatus): string {
+  const labels: Record<CSReturnStatus, string> = {
+    requested: '신청됨',
+    reviewing: '검토중',
+    approved: '승인됨',
+    rejected: '반려됨',
+    completed: '처리 완료',
+  };
+  return labels[status] || status;
+}
+
+export function getCSInquiryCategoryLabel(category: CSInquiryCategory): string {
+  const labels: Record<CSInquiryCategory, string> = {
+    order: '주문',
+    shipping: '배송',
+    return: '반품/교환',
+    product: '상품',
+    payment: '결제',
+    other: '기타',
+  };
+  return labels[category] || category;
+}
+
+export function getCSReturnReasonLabel(reason: CSReturnReason): string {
+  const labels: Record<CSReturnReason, string> = {
+    defective: '불량/파손',
+    wrong_item: '오배송',
+    not_as_described: '상품 설명과 다름',
+    changed_mind: '단순 변심',
+    other: '기타',
+  };
+  return labels[reason] || reason;
+}
+
+export function getCSReturnTypeLabel(type: CSReturnType): string {
+  return type === 'return' ? '반품' : '교환';
 }
