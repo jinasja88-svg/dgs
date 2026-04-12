@@ -1,0 +1,12 @@
+<svg width="2732" height="2732" viewBox="0 0 2732 2732" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- White background -->
+  <rect width="2732" height="2732" fill="#ffffff"/>
+  <!-- Centered icon (400x400) -->
+  <g transform="translate(1166, 1066)">
+    <rect width="400" height="400" rx="88" fill="#2563EB"/>
+    <path d="M114 207L179 272L286 136" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="286" cy="114" r="43" fill="#60A5FA"/>
+  </g>
+  <!-- App name -->
+  <text x="1366" y="1560" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="700" fill="#1A1A1A">딸깍소싱</text>
+</svg>

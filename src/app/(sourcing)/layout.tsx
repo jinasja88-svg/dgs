@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, FileText, Heart, ClipboardList, Clock, History, X } from 'lucide-react';
+import { Search, FileText, Heart, ClipboardList, Clock, History, X, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/utils';
 import { getRecentlyViewed, clearRecentlyViewed } from '@/lib/recently-viewed';
@@ -21,6 +21,7 @@ function proxyImg(url: string): string {
 
 const sidebarItems = [
   { label: '아이템검색', href: '/shop', icon: Search },
+  { label: '쿠팡분석', href: '/coupang', icon: TrendingUp },
   { label: '상세페이지 생성', href: '/detail-generator', icon: FileText },
   { label: '내찜목록', href: '/wishlist', icon: Heart },
   { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },
@@ -194,7 +195,7 @@ export default function SourcingLayout({
             className="md:hidden fixed inset-0 bg-black/40 z-40"
             onClick={() => setMobileHistoryOpen(false)}
           />
-          <div className="md:hidden fixed bottom-[56px] left-0 right-0 z-50 bg-white rounded-t-2xl shadow-lg max-h-[60vh] overflow-y-auto">
+          <div className="md:hidden fixed left-0 right-0 z-50 bg-white rounded-t-2xl shadow-lg max-h-[60vh] overflow-y-auto" style={{ bottom: 'calc(56px + var(--safe-area-bottom))' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
               <span className="text-sm font-semibold text-text-primary">히스토리</span>
               <button onClick={() => setMobileHistoryOpen(false)}>
@@ -289,7 +290,7 @@ export default function SourcingLayout({
       )}
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-border-light flex items-center justify-around py-2 px-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-border-light flex items-center justify-around py-2 px-1" style={{ paddingBottom: 'var(--safe-area-bottom)' }}>
         {sidebarItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (

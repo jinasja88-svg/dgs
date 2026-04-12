@@ -1,0 +1,38 @@
+{
+  "name": "딸깍소싱 - 1688 중국 소싱 대행",
+  "short_name": "딸깍소싱",
+  "description": "원클릭으로 쉽고 투명한 1688 중국 소싱 대행 플랫폼",
+  "start_url": "/shop",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#256ef4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-48.webp",
+      "type": "image/webp",
+      "sizes": "48x48"
+    },
+    {
+      "src": "/icons/icon-96.webp",
+      "type": "image/webp",
+      "sizes": "96x96"
+    },
+    {
+      "src": "/icons/icon-192.webp",
+      "type": "image/webp",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icons/icon-512.webp",
+      "type": "image/webp",
+      "sizes": "512x512"
+    },
+    {
+      "src": "/icons/icon-512.webp",
+      "type": "image/webp",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ]
+}
