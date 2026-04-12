@@ -11,6 +11,10 @@ function LoginContent() {
   const redirect = searchParams.get('redirect') || '/mypage';
   const queryError = searchParams.get('error');
   const [hashError, setHashError] = useState<string | null>(null);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
+
+  const canLogin = agreeTerms && agreePrivacy;
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -49,7 +53,8 @@ function LoginContent() {
         <div className="space-y-3">
           <button
             onClick={() => handleOAuth('google')}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-[var(--radius-md)] hover:bg-surface transition-colors text-sm font-medium"
+            disabled={!canLogin}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-[var(--radius-md)] hover:bg-surface transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -62,7 +67,8 @@ function LoginContent() {
 
           <button
             onClick={() => handleOAuth('kakao')}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#FEE500] rounded-[var(--radius-md)] hover:bg-[#FDD800] transition-colors text-sm font-medium text-[#191919]"
+            disabled={!canLogin}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#FEE500] rounded-[var(--radius-md)] hover:bg-[#FDD800] transition-colors text-sm font-medium text-[#191919] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#FEE500]"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#191919">
               <path d="M12 3C6.48 3 2 6.36 2 10.44c0 2.62 1.75 4.93 4.38 6.24l-1.12 4.16a.37.37 0 00.56.4l4.83-3.2c.44.04.89.06 1.35.06 5.52 0 10-3.36 10-7.5S17.52 3 12 3z" />
@@ -71,11 +77,39 @@ function LoginContent() {
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-text-tertiary">
-          로그인 시{' '}
-          <a href="/terms" className="underline">이용약관</a> 및{' '}
-          <a href="/privacy" className="underline">개인정보처리방침</a>에 동의합니다.
-        </p>
+        <div className="mt-6 space-y-2.5">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/30 cursor-pointer"
+            />
+            <span className="text-xs text-text-secondary">
+              <span className="text-primary font-semibold">[필수]</span>{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">
+                이용약관
+              </a>에 동의합니다
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreePrivacy}
+              onChange={(e) => setAgreePrivacy(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/30 cursor-pointer"
+            />
+            <span className="text-xs text-text-secondary">
+              <span className="text-primary font-semibold">[필수]</span>{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">
+                개인정보처리방침
+              </a>에 동의합니다
+            </span>
+          </label>
+          {!canLogin && (
+            <p className="text-[11px] text-text-tertiary pl-6">약관에 모두 동의해야 로그인할 수 있습니다.</p>
+          )}
+        </div>
       </div>
     </div>
   );
