@@ -19,10 +19,10 @@ function proxyImg(url: string): string {
   return url;
 }
 
-const sidebarItems = [
+const bottomNavItems = [
   { label: '아이템검색', href: '/shop', icon: Search },
   { label: '쿠팡분석', href: '/coupang', icon: TrendingUp },
-  { label: '상세페이지 생성', href: '/detail-generator', icon: FileText },
+  { label: '상세페이지', href: '/detail-generator', icon: FileText },
   { label: '내찜목록', href: '/wishlist', icon: Heart },
   { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },
 ];
@@ -45,7 +45,6 @@ export default function SourcingLayout({
     } catch {}
     setRecentlyViewed(getRecentlyViewed());
 
-    // 검색/상품 조회 시 갱신
     const onStorage = () => {
       try {
         setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'));
@@ -60,6 +59,11 @@ export default function SourcingLayout({
     };
   }, [pathname]);
 
+  const handleSearchClick = (term: string) => {
+    setMobileHistoryOpen(false);
+    router.push(`/shop?keyword=${encodeURIComponent(term)}`);
+  };
+
   const removeRecent = (term: string) => {
     const next = recentSearches.filter((k) => k !== term);
     setRecentSearches(next);
@@ -71,123 +75,8 @@ export default function SourcingLayout({
     localStorage.removeItem(RECENT_SEARCHES_KEY);
   };
 
-  const handleSearchClick = (term: string) => {
-    setMobileHistoryOpen(false);
-    router.push(`/shop?keyword=${encodeURIComponent(term)}`);
-  };
-
   return (
-    <div className="flex min-h-[calc(100vh-64px)]">
-      {/* Left Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 border-r border-border-light bg-white flex-shrink-0 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto">
-        <nav className="px-3 pt-6">
-          {sidebarItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-colors mb-1',
-                  isActive
-                    ? 'bg-primary-5 text-primary'
-                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                )}
-              >
-                <item.icon className={cn('w-4.5 h-4.5', isActive ? 'text-primary' : 'text-text-tertiary')} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* 사이드바 하단: 최근 검색어 + 최근 본 상품 */}
-        <div className="mt-auto border-t border-border-light px-3 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-64px-200px)]">
-          {/* 최근 검색어 */}
-          {recentSearches.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> 최근 검색어
-                </p>
-                <button onClick={clearAllRecent} className="text-[10px] text-text-tertiary hover:text-danger transition-colors">
-                  삭제
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {recentSearches.slice(0, 6).map((term) => (
-                  <span
-                    key={term}
-                    className="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 bg-surface border border-border-light rounded-full text-[11px] text-text-secondary"
-                  >
-                    <button
-                      onClick={() => handleSearchClick(term)}
-                      className="hover:text-primary transition-colors truncate max-w-[100px]"
-                    >
-                      {term}
-                    </button>
-                    <button
-                      onClick={() => removeRecent(term)}
-                      className="w-3.5 h-3.5 flex items-center justify-center hover:text-danger transition-colors flex-shrink-0"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 최근 본 상품 */}
-          {recentlyViewed.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wide flex items-center gap-1">
-                  <History className="w-3 h-3" /> 최근 본 상품
-                </p>
-                <button
-                  onClick={() => {
-                    clearRecentlyViewed();
-                    setRecentlyViewed([]);
-                  }}
-                  className="text-[10px] text-text-tertiary hover:text-danger transition-colors"
-                >
-                  삭제
-                </button>
-              </div>
-              <div className="space-y-2 max-h-[210px] overflow-y-auto">
-                {recentlyViewed.map((item) => (
-                  <Link
-                    key={item.product_id}
-                    href={`/shop/${item.product_id}`}
-                    className="flex items-center gap-2 group"
-                  >
-                    <div className="w-10 h-10 bg-surface border border-border-light rounded-[var(--radius-sm)] overflow-hidden flex-shrink-0">
-                      {item.image ? (
-                        <img
-                          src={proxyImg(item.image)}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-text-secondary line-clamp-1 group-hover:text-primary transition-colors">
-                        {item.title}
-                      </p>
-                      <p className="text-[11px] font-semibold text-primary">{formatPrice(item.price_krw)}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </aside>
-
+    <div className="min-h-[calc(100vh-64px)]">
       {/* Mobile History Bottom Sheet */}
       {mobileHistoryOpen && (
         <>
@@ -291,7 +180,7 @@ export default function SourcingLayout({
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-border-light flex items-center justify-around py-2 px-1" style={{ paddingBottom: 'var(--safe-area-bottom)' }}>
-        {sidebarItems.map((item) => {
+        {bottomNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
@@ -320,7 +209,7 @@ export default function SourcingLayout({
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 bg-surface min-w-0 pb-16 md:pb-0">
+      <main className="bg-surface min-h-[calc(100vh-64px)] pb-16 md:pb-0">
         {children}
       </main>
     </div>

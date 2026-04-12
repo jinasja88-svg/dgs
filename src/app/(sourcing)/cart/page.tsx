@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
+import toast from 'react-hot-toast';
 import { getCart, updateCartQty, removeFromCart, clearCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -69,10 +70,20 @@ export default function CartPage() {
           shipping_fee: SHIPPING_FEE,
         }),
       });
-      if (res.ok) {
-        clearCart();
-        router.push('/sourcing-orders');
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: '주문 생성에 실패했습니다.' }));
+        toast.error(err.error || '주문 생성에 실패했습니다.');
+        return;
       }
+
+      const order = await res.json();
+      clearCart();
+      reload();
+      // 결제 페이지로 이동 (Toss 연동 시 결제 진행, 미연동 시 안내 표시)
+      router.push(`/checkout?orderId=${order.order_number}`);
+    } catch {
+      toast.error('네트워크 오류가 발생했습니다.');
     } finally {
       setIsOrdering(false);
     }

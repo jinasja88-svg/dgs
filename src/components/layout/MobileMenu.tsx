@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { X, Search, FileText, Heart, ClipboardList, User, LogOut } from 'lucide-react';
+import { X, Search, TrendingUp, FileText, Heart, ClipboardList, User, LogOut } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface MobileMenuProps {
@@ -13,6 +13,7 @@ interface MobileMenuProps {
 
 const menuItems = [
   { label: '아이템검색', href: '/shop', icon: Search },
+  { label: '쿠팡분석', href: '/coupang', icon: TrendingUp },
   { label: '상세페이지 생성', href: '/detail-generator', icon: FileText },
   { label: '내찜목록', href: '/wishlist', icon: Heart },
   { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },

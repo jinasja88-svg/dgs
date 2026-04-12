@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'order_id와 rating(1~5)은 필수입니다' }, { status: 400 });
   }
 
+  if (body.comment && body.comment.length > 500) {
+    return NextResponse.json({ error: '리뷰는 500자 이내로 작성해주세요' }, { status: 400 });
+  }
+
   // 주문 소유권 확인
   const { data: order } = await supabase
     .from('sourcing_orders')

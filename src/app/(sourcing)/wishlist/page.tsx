@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Heart, Trash2, ShoppingCart, Search } from 'lucide-react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 import { formatPrice } from '@/lib/utils';
 import { createClient } from '@/lib/supabase';
@@ -71,16 +72,27 @@ export default function WishlistPage() {
       const toMigrate = localItems.filter((i) => !dbProductIds.has(i.product_id));
 
       if (toMigrate.length > 0) {
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           toMigrate.map((item) =>
             fetch('/api/sourcing/wishlist', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(item),
-            })
+            }).then((r) => { if (!r.ok) throw new Error('failed'); return r; })
           )
         );
-        localStorage.removeItem(WISHLIST_KEY);
+
+        const failedCount = results.filter((r) => r.status === 'rejected').length;
+
+        if (failedCount === 0) {
+          // 모든 항목 성공 시에만 localStorage 삭제
+          localStorage.removeItem(WISHLIST_KEY);
+        } else {
+          // 실패한 항목만 localStorage에 유지
+          const failedItems = toMigrate.filter((_, i) => results[i].status === 'rejected');
+          saveLocalWishlist(failedItems);
+          toast?.error?.(`${failedCount}개 항목 동기화에 실패했습니다. 다시 시도해주세요.`);
+        }
 
         // 마이그레이션 후 DB 재조회
         const res2 = await fetch('/api/sourcing/wishlist');

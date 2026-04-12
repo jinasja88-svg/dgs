@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update order status
-    await supabase
-      .from('orders')
+    const { error: updateError } = await supabase
+      .from('sourcing_orders')
       .update({
         status: 'paid',
         payment_key: paymentKey,
@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
       })
       .eq('order_number', orderId)
       .eq('user_id', user.id);
+
+    if (updateError) {
+      return NextResponse.json({ error: '주문 상태 업데이트에 실패했습니다.' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch {

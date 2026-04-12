@@ -351,7 +351,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               <label className="text-sm font-medium text-text-primary mb-2 block">수량</label>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setQuantity(Math.max(displayProduct!.min_order || 1, quantity - 1))}
+                  onClick={() => { const minOrder = displayProduct!.min_order || 1; if (quantity > minOrder) setQuantity(quantity - 1); }}
+                  disabled={quantity <= (displayProduct!.min_order || 1)}
                   className="w-9 h-9 flex items-center justify-center border border-border rounded-[var(--radius-sm)] hover:bg-surface"
                 >
                   <Minus className="w-4 h-4" />

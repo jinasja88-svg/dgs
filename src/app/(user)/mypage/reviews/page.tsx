@@ -7,10 +7,19 @@ import { createClient } from '@/lib/supabase';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import Skeleton from '@/components/ui/Skeleton';
 import { formatDate } from '@/lib/utils';
-import type { Review } from '@/types';
+
+interface SourcingReview {
+  id: string;
+  order_id: string;
+  user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  order?: { order_number: string; items: Array<{ title: string }> };
+}
 
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<SourcingReview[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -19,11 +28,11 @@ export default function ReviewsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
-        .from('reviews')
-        .select('*, product:products(title)')
+        .from('sourcing_reviews')
+        .select('*, order:sourcing_orders(order_number, items)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      if (data) setReviews(data as Review[]);
+      if (data) setReviews(data as SourcingReview[]);
       setLoading(false);
     }
     load();
@@ -31,7 +40,7 @@ export default function ReviewsPage() {
 
   const handleDelete = async (reviewId: string) => {
     if (!confirm('리뷰를 삭제하시겠습니까?')) return;
-    const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+    const { error } = await supabase.from('sourcing_reviews').delete().eq('id', reviewId);
     if (error) {
       toast.error('삭제에 실패했습니다.');
     } else {
@@ -58,7 +67,9 @@ export default function ReviewsPage() {
             <div key={review.id} className="bg-white border border-border rounded-[var(--radius-md)] p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium mb-1">{(review.product as unknown as { title: string })?.title}</p>
+                  <p className="text-sm font-medium mb-1">
+                    {review.order?.items?.[0]?.title || `주문 ${review.order?.order_number || ''}`}
+                  </p>
                   <div className="flex items-center gap-1 mb-2">
                     {Array.from({ length: 5 }).map((_, i) => (
                       <Star
@@ -67,7 +78,7 @@ export default function ReviewsPage() {
                       />
                     ))}
                   </div>
-                  {review.content && <p className="text-sm text-text-secondary">{review.content}</p>}
+                  {review.comment && <p className="text-sm text-text-secondary">{review.comment}</p>}
                   <p className="text-xs text-text-tertiary mt-2">{formatDate(review.created_at)}</p>
                 </div>
                 <button

@@ -269,6 +269,9 @@ export interface PaginatedResponse<T> {
   total_pages: number;
 }
 
+// Coupang Analysis types
+export type { CoupangProduct, DeliveryType, RocketSize, ProfitAnalysis, CoupangSortKey } from '@/lib/coupang/types';
+
 export interface Generated13SectionContent {
   hero: {
     headline_options: string[];

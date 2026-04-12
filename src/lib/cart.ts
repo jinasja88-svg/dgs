@@ -17,17 +17,22 @@ function saveCart(items: SourcingCartItem[]) {
   window.dispatchEvent(new Event('cart-updated'));
 }
 
-export function addToCart(item: SourcingCartItem): void {
+export function addToCart(item: SourcingCartItem): { success: boolean; removed?: boolean } {
   const cart = getCart();
   const key = item.product_id + (item.sku_id || '');
   const existing = cart.find((c) => c.product_id + (c.sku_id || '') === key);
+  let removed = false;
   if (existing) {
     existing.quantity += item.quantity;
   } else {
-    if (cart.length >= MAX_ITEMS) cart.shift();
+    if (cart.length >= MAX_ITEMS) {
+      cart.shift();
+      removed = true;
+    }
     cart.push({ ...item });
   }
   saveCart(cart);
+  return { success: true, removed };
 }
 
 export function updateCartQty(productId: string, skuId: string | undefined, quantity: number): void {

@@ -2,19 +2,36 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, User, LogOut, ShoppingCart } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Menu, User, LogOut, ShoppingCart, Search, TrendingUp, FileText, Heart, ClipboardList } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { getCartCount } from '@/lib/cart';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import MobileMenu from './MobileMenu';
+import HistoryDropdown from './HistoryDropdown';
+
+const navItems = [
+  { label: '아이템검색', href: '/shop', icon: Search },
+  { label: '쿠팡분석', href: '/coupang', icon: TrendingUp },
+  { label: '상세페이지', href: '/detail-generator', icon: FileText },
+  { label: '내찜목록', href: '/wishlist', icon: Heart },
+  { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },
+];
+
+// sourcing 관련 라우트에서만 네비 표시
+const SOURCING_PREFIXES = ['/shop', '/coupang', '/detail-generator', '/wishlist', '/sourcing-orders', '/cart'];
+const HIDE_NAV_PREFIXES = ['/admin', '/login', '/signup', '/reset-password'];
 
 export default function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const pathname = usePathname();
   const supabase = createClient();
+
+  const showNav = !HIDE_NAV_PREFIXES.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -30,7 +47,6 @@ export default function Header() {
     setCartCount(getCartCount());
     const onStorage = () => setCartCount(getCartCount());
     window.addEventListener('storage', onStorage);
-    // 같은 탭에서 장바구니 변경 감지용 커스텀 이벤트
     window.addEventListener('cart-updated', onStorage);
     return () => {
       window.removeEventListener('storage', onStorage);
@@ -58,19 +74,47 @@ export default function Header() {
         )}
         style={{ paddingTop: 'var(--safe-area-top)' }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto px-2 sm:px-3 lg:px-4">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="28" height="28" rx="8" fill="#2563EB" />
-                <path d="M8 14.5L12.5 19L20 9.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="20" cy="8" r="3" fill="#60A5FA" />
-              </svg>
-              딸깍소싱
-            </Link>
+            {/* Left: Logo + Nav */}
+            <div className="flex items-center gap-1 lg:gap-2">
+              <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary flex-shrink-0">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="28" height="28" rx="8" fill="#2563EB" />
+                  <path d="M8 14.5L12.5 19L20 9.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="20" cy="8" r="3" fill="#60A5FA" />
+                </svg>
+                <span className="hidden sm:inline">딸깍소싱</span>
+              </Link>
 
-            <div className="flex items-center gap-3">
-              {/* 장바구니 아이콘 (항상 노출) */}
+              {/* Desktop Nav */}
+              {showNav && (
+                <nav className="hidden md:flex items-center ml-4 lg:ml-6 gap-0.5">
+                  {navItems.map((item) => {
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-[var(--radius-md)] text-sm font-medium transition-colors whitespace-nowrap',
+                          isActive
+                            ? 'text-primary bg-primary-5'
+                            : 'text-text-secondary hover:text-primary hover:bg-surface'
+                        )}
+                      >
+                        <item.icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-primary' : 'text-text-tertiary')} />
+                        <span className="hidden lg:inline">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                  <HistoryDropdown />
+                </nav>
+              )}
+            </div>
+
+            {/* Right: Cart + Auth */}
+            <div className="flex items-center gap-2 lg:gap-3">
               <Link
                 href="/cart"
                 className="relative p-2 text-text-secondary hover:text-primary transition-colors"
