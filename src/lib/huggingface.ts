@@ -1,42 +1,36 @@
 import type { Generated13SectionContent } from '@/types';
 import { LLMError } from './llm-error';
 
-const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const TIMEOUT_MS = 60_000; // 13섹션 생성은 시간이 더 필요
+const HF_API_BASE = 'https://router.huggingface.co/v1';
+const DEFAULT_MODEL = 'Qwen/Qwen2.5-72B-Instruct';
+const TIMEOUT_MS = 90_000; // HF cold start 최대 40초 고려
 
-interface GeminiResponse {
-  candidates?: Array<{
-    content: { parts: { text: string }[] };
-  }>;
-  error?: { message: string; code: number };
-}
-
-export class GeminiError extends LLMError {
+export class HuggingFaceError extends LLMError {
   constructor(message: string, statusCode?: number) {
     super(message, statusCode);
-    this.name = 'GeminiError';
+    this.name = 'HuggingFaceError';
   }
 }
 
-async function callGemini(
+async function callHuggingFace(
   systemPrompt: string,
   userMessage: string,
   options?: { model?: string; temperature?: number; maxTokens?: number }
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new GeminiError('GEMINI_API_KEY is not set');
+  const token = process.env.HUGGINGFACE_API_TOKEN;
+  if (!token) throw new HuggingFaceError('HUGGINGFACE_API_TOKEN is not set');
 
-  const model = options?.model || 'gemini-2.0-flash';
-  const url = `${BASE_URL}/${model}:generateContent?key=${apiKey}`;
+  const model = options?.model ?? DEFAULT_MODEL;
+  const url = `${HF_API_BASE}/chat/completions`;
 
   const body = {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents: [{ role: 'user' as const, parts: [{ text: userMessage }] }],
-    generationConfig: {
-      temperature: options?.temperature ?? 0.8,
-      maxOutputTokens: options?.maxTokens ?? 4096,
-      responseMimeType: 'application/json',
-    },
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ],
+    temperature: options?.temperature ?? 0.8,
+    max_tokens: options?.maxTokens ?? 4096,
   };
 
   const controller = new AbortController();
@@ -45,38 +39,56 @@ async function callGemini(
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new GeminiError(`Gemini API error: ${res.status} ${text}`, res.status);
+      throw new HuggingFaceError(
+        `HuggingFace API error: ${res.status} ${text}`,
+        res.status
+      );
     }
 
-    const json: GeminiResponse = await res.json();
-    if (json.error) {
-      throw new GeminiError(`Gemini error: ${json.error.message}`, json.error.code);
-    }
-
-    const content = json.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) throw new GeminiError('Empty response from Gemini');
-    return content;
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) throw new HuggingFaceError('Empty response from HuggingFace');
+    return content as string;
   } catch (err) {
-    if (err instanceof GeminiError) throw err;
+    if (err instanceof HuggingFaceError) throw err;
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new GeminiError('Gemini request timeout', 408);
+      throw new HuggingFaceError('HuggingFace request timeout', 408);
     }
-    throw new GeminiError(err instanceof Error ? err.message : 'Unknown Gemini error');
+    throw new HuggingFaceError(
+      err instanceof Error ? err.message : 'Unknown HuggingFace error'
+    );
   } finally {
     clearTimeout(timeout);
   }
 }
 
+// JSON 응답 추출 — HF 모델은 JSON 모드가 없어 마크다운 코드블록 등이 포함될 수 있음
+function extractJson(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{')) return trimmed;
+  const fence = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (fence) return fence[1].trim();
+  const first = trimmed.indexOf('{');
+  const last = trimmed.lastIndexOf('}');
+  if (first !== -1 && last > first) return trimmed.slice(first, last + 1);
+  return trimmed;
+}
+
 // ─── 13섹션 카피 시스템 프롬프트 ───
 
-const SYSTEM_PROMPT = `당신은 한국 이커머스 최고의 상세페이지 카피라이터입니다.
+const SYSTEM_PROMPT = `You must respond with ONLY valid JSON. No markdown, no code fences, no explanation — just the raw JSON object.
+
+당신은 한국 이커머스 최고의 상세페이지 카피라이터입니다.
 1688에서 소싱한 상품의 고전환 상세페이지(13섹션)를 작성합니다.
 
 ## 카피 원칙
@@ -100,7 +112,7 @@ const SYSTEM_PROMPT = `당신은 한국 이커머스 최고의 상세페이지 �
 - "그 마음 알아요"
 - "당신 탓이 아닙니다"
 
-반드시 JSON만 출력하세요.`;
+반드시 JSON만 출력하세요. 마크다운 코드블록 없이 순수 JSON만.`;
 
 // ─── 13섹션 생성 함수 ───
 
@@ -117,9 +129,10 @@ export async function generate13SectionContent(
     min_order?: number;
   }
 ): Promise<Generated13SectionContent> {
-  const skuSummary = productData.skus.length > 0
-    ? productData.skus.slice(0, 10).map(s => s.name).join(', ')
-    : '단일 상품';
+  const skuSummary =
+    productData.skus.length > 0
+      ? productData.skus.slice(0, 10).map((s) => s.name).join(', ')
+      : '단일 상품';
 
   const sellerInfo = productData.seller
     ? `${productData.seller.name}${productData.seller.rating ? ` (평점 ${productData.seller.rating})` : ''}${productData.seller.years ? ` ${productData.seller.years}년 운영` : ''}`
@@ -200,59 +213,79 @@ ${productData.min_order ? `- 최소주문: ${productData.min_order}개` : ''}
     "closing": "마무리 문구 (1문장)"
   },
   "trust_text": "품질/신뢰 보증 한 문장"
-}`;
+}
 
-  const content = await callGemini(SYSTEM_PROMPT, userPrompt, { maxTokens: 4096 });
+위 JSON 구조를 그대로 사용하여 순수 JSON만 응답하세요. 다른 텍스트나 마크다운 없이.`;
 
-  try {
-    const p = JSON.parse(content);
-    return {
-      hero: {
-        headline_options: Array.isArray(p.hero?.headline_options) ? p.hero.headline_options : [productData.title],
-        subheadline: p.hero?.subheadline || '',
-        urgency_badge: p.hero?.urgency_badge || '',
-        cta_text: p.hero?.cta_text || '자세히 보기',
-      },
-      pain: {
-        intro: p.pain?.intro || '',
-        pain_points: Array.isArray(p.pain?.pain_points) ? p.pain.pain_points : [],
-        emotional_hook: p.pain?.emotional_hook || '',
-      },
-      problem: {
-        hook: p.problem?.hook || '',
-        reasons: Array.isArray(p.problem?.reasons) ? p.problem.reasons : [],
-        reframe: p.problem?.reframe || '',
-      },
-      solution: {
-        intro: p.solution?.intro || '',
-        one_liner: p.solution?.one_liner || '',
-        target_fit: p.solution?.target_fit || '',
-      },
-      how_it_works: {
-        steps: Array.isArray(p.how_it_works?.steps) ? p.how_it_works.steps : [],
-      },
-      benefits: {
-        items: Array.isArray(p.benefits?.items) ? p.benefits.items : [],
-      },
-      social_proof: {
-        headline: p.social_proof?.headline || '',
-        stats: Array.isArray(p.social_proof?.stats) ? p.social_proof.stats : [],
-        testimonials: Array.isArray(p.social_proof?.testimonials) ? p.social_proof.testimonials : [],
-      },
-      target_filter: {
-        recommended: Array.isArray(p.target_filter?.recommended) ? p.target_filter.recommended : [],
-        not_recommended: Array.isArray(p.target_filter?.not_recommended) ? p.target_filter.not_recommended : [],
-      },
-      faq: Array.isArray(p.faq) ? p.faq : [],
-      final_cta: {
-        headline: p.final_cta?.headline || '',
-        urgency: p.final_cta?.urgency || '',
-        cta_text: p.final_cta?.cta_text || '지금 주문하기',
-        closing: p.final_cta?.closing || '',
-      },
-      trust_text: p.trust_text || '',
-    };
-  } catch {
-    throw new GeminiError('Failed to parse Gemini response as JSON');
+  // JSON 파싱 실패 시 최대 2회 재시도
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const raw = await callHuggingFace(SYSTEM_PROMPT, userPrompt, { maxTokens: 4096 });
+      const p = JSON.parse(extractJson(raw));
+
+      return {
+        hero: {
+          headline_options: Array.isArray(p.hero?.headline_options)
+            ? p.hero.headline_options
+            : [productData.title],
+          subheadline: p.hero?.subheadline || '',
+          urgency_badge: p.hero?.urgency_badge || '',
+          cta_text: p.hero?.cta_text || '자세히 보기',
+        },
+        pain: {
+          intro: p.pain?.intro || '',
+          pain_points: Array.isArray(p.pain?.pain_points) ? p.pain.pain_points : [],
+          emotional_hook: p.pain?.emotional_hook || '',
+        },
+        problem: {
+          hook: p.problem?.hook || '',
+          reasons: Array.isArray(p.problem?.reasons) ? p.problem.reasons : [],
+          reframe: p.problem?.reframe || '',
+        },
+        solution: {
+          intro: p.solution?.intro || '',
+          one_liner: p.solution?.one_liner || '',
+          target_fit: p.solution?.target_fit || '',
+        },
+        how_it_works: {
+          steps: Array.isArray(p.how_it_works?.steps) ? p.how_it_works.steps : [],
+        },
+        benefits: {
+          items: Array.isArray(p.benefits?.items) ? p.benefits.items : [],
+        },
+        social_proof: {
+          headline: p.social_proof?.headline || '',
+          stats: Array.isArray(p.social_proof?.stats) ? p.social_proof.stats : [],
+          testimonials: Array.isArray(p.social_proof?.testimonials)
+            ? p.social_proof.testimonials
+            : [],
+        },
+        target_filter: {
+          recommended: Array.isArray(p.target_filter?.recommended)
+            ? p.target_filter.recommended
+            : [],
+          not_recommended: Array.isArray(p.target_filter?.not_recommended)
+            ? p.target_filter.not_recommended
+            : [],
+        },
+        faq: Array.isArray(p.faq) ? p.faq : [],
+        final_cta: {
+          headline: p.final_cta?.headline || '',
+          urgency: p.final_cta?.urgency || '',
+          cta_text: p.final_cta?.cta_text || '지금 주문하기',
+          closing: p.final_cta?.closing || '',
+        },
+        trust_text: p.trust_text || '',
+      };
+    } catch (err) {
+      const isParseError =
+        err instanceof SyntaxError ||
+        (err instanceof HuggingFaceError && err.message.includes('parse'));
+      if (attempt === 2 || !isParseError) throw err;
+      // JSON 파싱 실패면 재시도
+    }
   }
+
+  // TypeScript를 위한 unreachable fallback
+  throw new HuggingFaceError('Failed to generate content after retries');
 }

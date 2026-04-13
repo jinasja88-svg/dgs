@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { generate13SectionContent, GeminiError } from '@/lib/gemini';
+import { LLMError } from '@/lib/llm-error';
+import { generate13SectionContent as generateGemini } from '@/lib/gemini';
+import { generate13SectionContent as generateHF } from '@/lib/huggingface';
 import { logApiCall } from '@/lib/api-logger';
+
+// LLM_PROVIDER=gemini 이면 Gemini, 그 외(기본값)는 HuggingFace
+const generate13SectionContent =
+  process.env.LLM_PROVIDER === 'gemini' ? generateGemini : generateHF;
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +38,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('Detail generate error:', err);
 
-    if (err instanceof GeminiError) {
+    if (err instanceof LLMError) {
       return NextResponse.json(
         { error: `AI 생성 오류: ${err.message}` },
         { status: err.statusCode || 500 }
