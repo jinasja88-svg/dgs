@@ -26,8 +26,9 @@ export default function CartPage() {
   }, [reload]);
 
   const handleQty = (item: SourcingCartItem, delta: number) => {
+    const min = item.min_order || 1;
     const next = item.quantity + delta;
-    if (next <= 0) return;
+    if (next < min) return;
     updateCartQty(item.product_id, item.sku_id, next);
     reload();
   };
@@ -145,14 +146,17 @@ export default function CartPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary line-clamp-2 mb-1">{item.title}</p>
                   {item.sku_name && (
-                    <p className="text-xs text-text-tertiary mb-2">{item.sku_name}</p>
+                    <p className="text-xs text-text-tertiary">{item.sku_name}</p>
+                  )}
+                  {item.min_order && item.min_order > 1 && (
+                    <p className="text-xs text-warning mb-2">최소 주문 {item.min_order}개</p>
                   )}
                   <div className="flex items-center justify-between">
                     {/* 수량 조절 */}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleQty(item, -1)}
-                        disabled={item.quantity <= 1}
+                        disabled={item.quantity <= (item.min_order || 1)}
                         className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-surface disabled:opacity-40 transition-colors"
                       >
                         <Minus className="w-3 h-3" />

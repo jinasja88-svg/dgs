@@ -199,6 +199,7 @@ export interface SourcingCartItem {
   quantity: number;
   price_cny: number;
   price_krw: number;
+  min_order?: number;
 }
 
 export interface SourcingReview {

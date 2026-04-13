@@ -101,6 +101,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     });
   }, [productId]);
 
+  // 상품 로드 완료 시 min_order로 초기 수량 설정
+  useEffect(() => {
+    if (displayProduct?.min_order && displayProduct.min_order > 1) {
+      setQuantity(displayProduct.min_order);
+    }
+  }, [displayProduct?.product_id, displayProduct?.min_order]);
+
   // 상품 로드 완료 시 최근 본 상품 저장
   useEffect(() => {
     if (displayProduct) {
@@ -179,6 +186,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       quantity,
       price_cny: currentPriceCny,
       price_krw: currentPrice,
+      min_order: displayProduct!.min_order || 1,
     });
     toast.success('장바구니에 담았습니다!');
     setAddedToCart(true);
