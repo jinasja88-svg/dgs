@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Search, ImagePlus, Filter, X, Upload, ArrowUpDown } from 'lucide-react';
+import { Search, ImagePlus, Filter, X, Upload, ArrowUpDown, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase';
 import Button from '@/components/ui/Button';
@@ -22,6 +23,12 @@ function proxyImg(url: string): string {
 const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
 const MAX_RECENT = 8;
 
+const POPULAR_KEYWORDS = [
+  '블루투스 이어폰', '후드티', '텀블러', '무선 마우스', '레깅스',
+  '에어팟 케이스', '캠핑 용품', '주방 용품', '반려동물 용품', '운동화',
+  '선글라스', '파우치', '충전기', '스티커', '미니 선풍기',
+];
+
 type SortOption = 'recommend' | 'sales' | 'price_up' | 'price_down' | 'rating' | 'repurchase';
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'recommend', label: '추천순' },
@@ -31,6 +38,17 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'rating', label: '평점순' },
   { value: 'repurchase', label: '재구매율순' },
 ];
+
+// 1688 URL 또는 순수 상품 ID에서 product_id 추출
+function extract1688Id(input: string): string | null {
+  const trimmed = input.trim();
+  // 순수 숫자 ID (10자리 이상)
+  if (/^\d{10,}$/.test(trimmed)) return trimmed;
+  // 1688 URL 패턴: /offer/123.html 또는 detail.1688.com/...
+  const match = trimmed.match(/\/offer\/(\d+)|detail\.1688\.com[^/]*\/(\d{10,})|[?&]offerId=(\d+)/);
+  if (match) return match[1] || match[2] || match[3];
+  return null;
+}
 
 function saveRecentSearch(keyword: string) {
   if (!keyword.trim()) return;
@@ -42,6 +60,7 @@ function saveRecentSearch(keyword: string) {
 }
 
 export default function ShopPage() {
+  const router = useRouter();
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -52,8 +71,20 @@ export default function ShopPage() {
   const [similarSearchSource, setSimilarSearchSource] = useState<string | null>(null);
   const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('rating');
+  const [popularPage, setPopularPage] = useState(0);
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [appliedPriceMin, setAppliedPriceMin] = useState<number | null>(null);
+  const [appliedPriceMax, setAppliedPriceMax] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const POPULAR_PAGE_SIZE = 6;
+  const popularTotalPages = Math.ceil(POPULAR_KEYWORDS.length / POPULAR_PAGE_SIZE);
+  const visibleKeywords = POPULAR_KEYWORDS.slice(
+    popularPage * POPULAR_PAGE_SIZE,
+    (popularPage + 1) * POPULAR_PAGE_SIZE
+  );
 
   // 사용자명 & 취향 카테고리 로드
   useEffect(() => {
@@ -121,19 +152,53 @@ export default function ShopPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = searchInput.trim();
+
+    // 1688 URL 또는 상품 ID 감지
+    const extractedId = extract1688Id(trimmed);
+    if (extractedId) {
+      router.push(`/shop/${extractedId}`);
+      return;
+    }
+
     setImageResults(null);
     setSimilarSearchSource(null);
-    setKeyword(searchInput);
-    if (searchInput.trim()) {
-      saveRecentSearch(searchInput.trim());
+    setKeyword(trimmed);
+    if (trimmed) {
+      saveRecentSearch(trimmed);
       window.dispatchEvent(new Event('recent-updated'));
-      // DB 동기화 (fire and forget)
       fetch('/api/sourcing/search-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: searchInput.trim() }),
+        body: JSON.stringify({ keyword: trimmed }),
       }).catch(() => {});
     }
+  };
+
+  const handlePopularKeywordClick = (kw: string) => {
+    setSearchInput(kw);
+    setImageResults(null);
+    setSimilarSearchSource(null);
+    setKeyword(kw);
+    saveRecentSearch(kw);
+    window.dispatchEvent(new Event('recent-updated'));
+    fetch('/api/sourcing/search-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: kw }),
+    }).catch(() => {});
+  };
+
+  const applyPriceFilter = () => {
+    setAppliedPriceMin(priceMin ? Number(priceMin) : null);
+    setAppliedPriceMax(priceMax ? Number(priceMax) : null);
+  };
+
+  const clearPriceFilter = () => {
+    setPriceMin('');
+    setPriceMax('');
+    setAppliedPriceMin(null);
+    setAppliedPriceMax(null);
   };
 
   // Image URL 기반 검색 (돋보기 버튼 / URL 직접 입력)
@@ -172,7 +237,6 @@ export default function ShopPage() {
     setIsImageSearching(true);
     setSimilarSearchSource(null);
     try {
-      // 파일을 base64 data URL로 변환하여 API에 전달
       const base64 = await new Promise<string>((resolve) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result as string);
@@ -215,7 +279,15 @@ export default function ShopPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const displayProducts = imageResults || infiniteData?.pages.flatMap((p) => p.data) || [];
+  const rawProducts = imageResults || infiniteData?.pages.flatMap((p) => p.data) || [];
+
+  // 가격 범위 필터 (클라이언트 사이드)
+  const displayProducts = rawProducts.filter((p) => {
+    if (appliedPriceMin !== null && p.price_krw < appliedPriceMin) return false;
+    if (appliedPriceMax !== null && p.price_krw > appliedPriceMax) return false;
+    return true;
+  });
+
   const totalCount = infiniteData?.pages[0]?.total ?? 0;
 
   // 취향 카테고리를 앞으로 정렬
@@ -228,10 +300,10 @@ export default function ShopPage() {
 
   return (
     <div className="p-6 lg:p-8">
-{/* Page Title */}
+      {/* Page Title */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">아이템 검색</h1>
-        <p className="text-sm text-text-tertiary mt-1">1688에서 원하는 상품을 키워드 또는 이미지로 검색하세요</p>
+        <p className="text-sm text-text-tertiary mt-1">1688에서 원하는 상품을 키워드, URL 또는 이미지로 검색하세요</p>
       </div>
 
       {/* Search Section */}
@@ -259,21 +331,53 @@ export default function ShopPage() {
         </div>
 
         {searchMode === 'keyword' ? (
-          <form onSubmit={handleSearch} className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="상품명을 입력하세요 (예: 블루투스 이어폰, 후드티, 텀블러)"
-                className="w-full pl-11 pr-4 py-3 border border-border rounded-[var(--radius-md)] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
-              />
+          <>
+            <form onSubmit={handleSearch} className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="상품명, 1688 URL 또는 상품 ID를 입력하세요"
+                  className="w-full pl-11 pr-4 py-3 border border-border rounded-[var(--radius-md)] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                />
+              </div>
+              <Button type="submit" size="lg">
+                검색
+              </Button>
+            </form>
+
+            {/* 인기 검색어 슬라이더 */}
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-xs text-text-tertiary flex-shrink-0 font-medium">🔥 인기</span>
+              <div className="flex items-center gap-1.5 flex-1 overflow-hidden">
+                {visibleKeywords.map((kw) => (
+                  <button
+                    key={kw}
+                    onClick={() => handlePopularKeywordClick(kw)}
+                    className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs bg-surface text-text-secondary hover:bg-primary-5 hover:text-primary transition-colors border border-border"
+                  >
+                    {kw}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <button
+                  onClick={() => setPopularPage((p) => (p - 1 + popularTotalPages) % popularTotalPages)}
+                  className="w-6 h-6 flex items-center justify-center rounded text-text-tertiary hover:text-primary hover:bg-primary-5 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setPopularPage((p) => (p + 1) % popularTotalPages)}
+                  className="w-6 h-6 flex items-center justify-center rounded text-text-tertiary hover:text-primary hover:bg-primary-5 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <Button type="submit" size="lg">
-              검색
-            </Button>
-          </form>
+          </>
         ) : (
           <div
             onDragOver={(e) => e.preventDefault()}
@@ -341,7 +445,7 @@ export default function ShopPage() {
 
       {/* Category Filter */}
       {!imageResults && (
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
           <Filter className="w-4 h-4 text-text-tertiary flex-shrink-0" />
           <button
             onClick={() => { setSelectedCategory(''); }}
@@ -367,25 +471,61 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Sort Options */}
-      {!imageResults && (
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
-          <ArrowUpDown className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-          {SORT_OPTIONS.map((opt) => (
+      {/* Sort + Price Filter Row */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {!imageResults && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <ArrowUpDown className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setSortOption(opt.value)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  sortOption === opt.value
+                    ? 'bg-primary text-white'
+                    : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 가격 범위 필터 */}
+        <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+          <span className="text-xs text-text-tertiary">₩</span>
+          <input
+            type="number"
+            value={priceMin}
+            onChange={(e) => setPriceMin(e.target.value)}
+            placeholder="최소"
+            className="w-20 px-2 py-1.5 border border-border rounded-[var(--radius-sm)] text-xs focus:outline-none focus:border-primary"
+          />
+          <span className="text-xs text-text-tertiary">~</span>
+          <input
+            type="number"
+            value={priceMax}
+            onChange={(e) => setPriceMax(e.target.value)}
+            placeholder="최대"
+            className="w-20 px-2 py-1.5 border border-border rounded-[var(--radius-sm)] text-xs focus:outline-none focus:border-primary"
+          />
+          <button
+            onClick={applyPriceFilter}
+            className="px-2.5 py-1.5 bg-primary text-white text-xs rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors"
+          >
+            적용
+          </button>
+          {(appliedPriceMin !== null || appliedPriceMax !== null) && (
             <button
-              key={opt.value}
-              onClick={() => setSortOption(opt.value)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                sortOption === opt.value
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-border text-text-secondary hover:bg-primary-5'
-              }`}
+              onClick={clearPriceFilter}
+              className="w-6 h-6 flex items-center justify-center text-text-tertiary hover:text-danger transition-colors"
             >
-              {opt.label}
+              <X className="w-3.5 h-3.5" />
             </button>
-          ))}
+          )}
         </div>
-      )}
+      </div>
 
       {/* Results */}
       {isLoading || isImageSearching ? (
@@ -406,10 +546,13 @@ export default function ShopPage() {
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-text-tertiary">
                 {imageResults ? (
-                  <>이미지 검색 결과 <strong className="text-text-primary">{imageResults.length}</strong>개</>
+                  <>이미지 검색 결과 <strong className="text-text-primary">{displayProducts.length}</strong>개</>
                 ) : (
-                  <>총 <strong className="text-text-primary">{totalCount}</strong>개 상품</>
-
+                  <>총 <strong className="text-text-primary">{totalCount}</strong>개 상품
+                    {(appliedPriceMin !== null || appliedPriceMax !== null) && (
+                      <span className="ml-1 text-primary">(필터 적용: {displayProducts.length}개)</span>
+                    )}
+                  </>
                 )}
               </p>
               {imageResults && (
@@ -447,7 +590,7 @@ export default function ShopPage() {
                     </div>
                   </Link>
 
-                  {/* Magnifying glass - similar image search button */}
+                  {/* 유사 상품 검색 버튼 */}
                   {product.images[0] && (
                     <button
                       onClick={(e) => {
@@ -485,6 +628,14 @@ export default function ShopPage() {
                           {product.seller.repurchase_rate != null && product.seller.repurchase_rate > 0 && (
                             <span className="text-[10px] text-green-600">재구매 {product.seller.repurchase_rate}%</span>
                           )}
+                        </div>
+                      )}
+                      {product.seller?.sales_90d != null && product.seller.sales_90d > 0 && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <TrendingUp className="w-3 h-3 text-text-tertiary" />
+                          <span className="text-[11px] text-text-secondary">
+                            월 판매량 ~{Math.round(product.seller.sales_90d / 3).toLocaleString()}개
+                          </span>
                         </div>
                       )}
                       {product.min_order && product.min_order > 1 && (
