@@ -50,6 +50,19 @@ All product data comes from **TMAPI** (`api.tmapi.io`), a paid third-party REST 
 - **`errors.ts`** — `TmapiError`, `TmapiRateLimitError`, `TmapiAuthError`
 - **`index.ts`** — Singleton `getTmapiClient()` (reads `TMAPI_API_TOKEN`), re-exports `tmapiCache` and `CACHE_TTL`
 
+### Detail Page Generator (`/detail-generator`)
+
+AI-powered Korean marketing page generator. Takes a 1688 product URL → fetches product data + raw HTML description → generates a 13-section high-conversion Korean copy.
+
+- **`src/lib/llm-error.ts`** — `LLMError` base class shared by all LLM providers
+- **`src/lib/gemini.ts`** — Google Gemini client (`generate13SectionContent`). Uses native JSON mode (`responseMimeType: 'application/json'`).
+- **`src/lib/huggingface.ts`** — HF Serverless client (`Qwen/Qwen2.5-72B-Instruct` by default). Includes `extractJson()` to strip markdown fences from responses; retries up to 3× on JSON parse failure. 90s timeout.
+- **`src/app/api/detail-generator/generate/route.ts`** — Selects provider via `LLM_PROVIDER` env var (default: `huggingface`). Set to `gemini` to use Gemini instead.
+- **`src/components/detail-generator/`** — `DetailPagePreview` (13-section inline-editable preview), `ExportToolbar` (HTML copy + PNG download via html2canvas), `GenerationProgress`, `EditableText`
+- **`src/app/api/sourcing/product-desc/[id]`** — Fetches raw HTML from 1688 `detail_url`, extracts `var offer_details={"content":"..."}`, proxies alicdn images through `/api/image-proxy`
+
+The `Generated13SectionContent` type (in `src/types/index.ts`) defines the full 13-section structure: hero, pain, problem, solution, how_it_works, benefits, social_proof, target_filter, faq, final_cta, trust_text.
+
 ### Legacy: Direct MTOP Integration (`src/lib/ali1688/`)
 
 Previously used for direct 1688 MTOP protocol calls via Squid proxy. Now replaced by TMAPI. Retained in case direct access is needed (image upload, product page scraping).
@@ -144,6 +157,9 @@ TMAPI_API_TOKEN                # TMAPI (api.tmapi.io) subscription token
 NAVER_CLIENT_ID                # Papago translation
 NAVER_CLIENT_SECRET
 ADMIN_EMAILS                   # Comma-separated admin email whitelist
+LLM_PROVIDER                   # huggingface (default) or gemini
+HUGGINGFACE_API_TOKEN          # HF Serverless API token (hf_...)
+GEMINI_API_KEY                 # Required only when LLM_PROVIDER=gemini
 EXCHANGE_RATE_API_KEY          # Optional — paid tier for exchange rates
 ALI1688_HTTPS_PROXY            # Optional — legacy Squid proxy (not needed with TMAPI)
 ```
