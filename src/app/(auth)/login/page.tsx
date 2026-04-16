@@ -32,6 +32,9 @@ function LoginContent() {
       provider,
       options: {
         redirectTo: `${window.location.origin}/callback?redirect=${encodeURIComponent(redirect)}`,
+        ...(provider === 'kakao' && {
+          scopes: 'account_email profile_nickname',
+        }),
       },
     });
   };
