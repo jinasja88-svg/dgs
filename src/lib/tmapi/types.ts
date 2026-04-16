@@ -169,10 +169,12 @@ export interface TmapiSearchParams {
   page?: number;
   page_size?: number;
   sort?: 'default' | 'sales' | 'price_up' | 'price_down';
+  language?: string;
 }
 
 export interface TmapiImageSearchParams {
   img_url: string;
   page?: number;
   page_size?: number;
+  language?: string;
 }

@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getTmapiClient, tmapiCache, CACHE_TTL, mapImageSearchItemToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
-import { translateProducts } from '@/lib/translation';
 
 export async function POST(request: NextRequest) {
   let body: { image_url?: string; page?: number };
@@ -33,10 +32,9 @@ export async function POST(request: NextRequest) {
       client.searchByImage({ img_url: image_url, page, page_size: 20 })
     );
 
-    const rawProducts = result.items.map((item) =>
+    const products = result.items.map((item) =>
       mapImageSearchItemToSourcingProduct(item, exchangeRate)
     );
-    const products = await translateProducts(rawProducts, { skipSkus: true });
 
     const responseBody = {
       data: products,

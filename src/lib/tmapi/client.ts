@@ -75,6 +75,7 @@ export class TmapiClient {
       keyword: params.keyword,
       page: String(params.page || 1),
       page_size: String(Math.min(params.page_size || 20, 20)),
+      language: params.language || 'ko',
       ...(params.sort ? { sort: params.sort } : {}),
     });
   }
@@ -98,6 +99,7 @@ export class TmapiClient {
       img_url: params.img_url,
       page: String(params.page || 1),
       page_size: String(Math.min(params.page_size || 20, 20)),
+      language: params.language || 'ko',
     });
   }
 }

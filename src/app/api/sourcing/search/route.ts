@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getTmapiClient, tmapiCache, CACHE_TTL, mapSearchItemToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
-import { translateProducts, translateSearchQuery } from '@/lib/translation';
 import type { SourcingProduct } from '@/types';
 
 type SortOption = 'recommend' | 'sales' | 'price_up' | 'price_down' | 'rating' | 'repurchase';
@@ -84,8 +83,8 @@ export async function GET(request: NextRequest) {
   const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 20);
   const sort = (searchParams.get('sort') || 'recommend') as SortOption;
 
-  // 검색 키워드 조합 (한국어 키워드는 중국어로 번역)
-  let searchKeyword = await translateSearchQuery(keyword);
+  // 검색 키워드 조합 (한국어 그대로 TMAPI에 전달)
+  let searchKeyword = keyword;
   if (category && CATEGORY_KEYWORD_MAP[category]) {
     const catKeyword = CATEGORY_KEYWORD_MAP[category];
     searchKeyword = searchKeyword ? `${searchKeyword} ${catKeyword}` : catKeyword;
@@ -127,9 +126,6 @@ export async function GET(request: NextRequest) {
         p.category = category;
       }
     }
-
-    // 검색 목록은 SKU 표시 안 하므로 title만 번역
-    products = await translateProducts(products, { skipSkus: true });
 
     const responseBody = {
       data: products,
