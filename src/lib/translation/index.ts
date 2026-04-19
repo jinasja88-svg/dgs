@@ -5,7 +5,7 @@
  */
 
 import type { SourcingProduct } from '@/types';
-import { translateZhToKo, translateKoToZh } from './papago';
+import { translateZhToKo, translateKoToZh, translateZhToKoBatch } from './papago';
 import { lookupZhToKo, containsChinese, containsKorean } from './lookup';
 import { getCached, setCached } from './cache';
 
@@ -64,21 +64,58 @@ async function translateProperties(
 }
 
 // 상품 배열 일괄 번역
-// skipSkus: 검색 목록처럼 SKU가 필요 없을 때 true로 설정 → Papago 호출 대폭 감소
+// skipSkus: 검색 목록처럼 SKU가 필요 없을 때 true로 설정 → API 호출 대폭 감소
 export async function translateProducts(
   products: SourcingProduct[],
   options: { skipSkus?: boolean } = {}
 ): Promise<SourcingProduct[]> {
-  const CONCURRENCY = 15;
-  const results: SourcingProduct[] = [];
+  if (products.length === 0) return products;
 
-  for (let i = 0; i < products.length; i += CONCURRENCY) {
-    const batch = products.slice(i, i + CONCURRENCY);
-    const translated = await Promise.all(batch.map((p) => translateProduct(p, options.skipSkus)));
-    results.push(...translated);
+  // 타이틀 배치 번역: 캐시 미스인 것만 단일 API 호출
+  const titlesToTranslate: { idx: number; text: string }[] = [];
+  const titleResults: string[] = products.map((p) => p.title);
+
+  for (let i = 0; i < products.length; i++) {
+    const title = products[i].title;
+    if (!title || !containsChinese(title)) continue;
+
+    const cached = getCached(title, 'zh2ko');
+    if (cached !== null) {
+      titleResults[i] = cached;
+      continue;
+    }
+    const lookup = lookupZhToKo(title);
+    if (lookup !== null) {
+      setCached(title, 'zh2ko', lookup);
+      titleResults[i] = lookup;
+      continue;
+    }
+    titlesToTranslate.push({ idx: i, text: title });
   }
 
-  return results;
+  // 캐시 미스 타이틀만 한 번에 번역
+  if (titlesToTranslate.length > 0) {
+    const batchTexts = titlesToTranslate.map((t) => t.text);
+    const batchResults = await translateZhToKoBatch(batchTexts);
+    for (let j = 0; j < titlesToTranslate.length; j++) {
+      const { idx, text } = titlesToTranslate[j];
+      const translated = batchResults[j];
+      setCached(text, 'zh2ko', translated);
+      titleResults[idx] = translated;
+    }
+  }
+
+  // skipSkus일 때는 타이틀만 교체하여 반환
+  if (options.skipSkus) {
+    return products.map((p, i) => ({
+      ...p,
+      title: titleResults[i],
+      title_zh: p.title_zh ?? p.title,
+    }));
+  }
+
+  // SKU 포함 번역 (상세 페이지)
+  return Promise.all(products.map((p, i) => translateProduct({ ...p, title: titleResults[i] }, false)));
 }
 
 async function translateProduct(product: SourcingProduct, skipSkus = false): Promise<SourcingProduct> {
