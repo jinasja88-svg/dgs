@@ -124,7 +124,7 @@ export default function ShopPage() {
       if (selectedCategory) params.set('category', selectedCategory);
       params.set('sort', sortOption);
       params.set('page', String(pageParam));
-      params.set('per_page', '20');
+      params.set('per_page', '10');
       return fetch(`/api/sourcing/search?${params}`).then((r) => r.json());
     },
     initialPageParam: 1,

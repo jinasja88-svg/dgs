@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getTmapiClient, tmapiCache, CACHE_TTL, mapSearchItemToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
+import { translateProducts } from '@/lib/translation';
 import type { SourcingProduct } from '@/types';
 
 type SortOption = 'recommend' | 'sales' | 'price_up' | 'price_down' | 'rating' | 'repurchase';
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
   const keyword = searchParams.get('keyword') || '';
   const category = searchParams.get('category') || '';
   const page = parseInt(searchParams.get('page') || '1');
-  const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 20);
+  const perPage = Math.min(parseInt(searchParams.get('per_page') || '10'), 20);
   const sort = (searchParams.get('sort') || 'recommend') as SortOption;
 
   // 검색 키워드 조합 (한국어 그대로 TMAPI에 전달)
@@ -117,6 +118,9 @@ export async function GET(request: NextRequest) {
     let products = result.items.map((item) =>
       mapSearchItemToSourcingProduct(item, exchangeRate)
     );
+
+    // 타이틀 번역 (SKU 제외)
+    products = await translateProducts(products, { skipSkus: true });
 
     // 후처리 정렬 적용
     applyPostSort(products, sort);
