@@ -47,8 +47,7 @@ export async function translateZhToKo(text: string): Promise<string> {
 }
 
 /**
- * 여러 중국어 텍스트를 단일 API 호출로 번역
- * 빈 문자열이나 중국어가 없는 항목은 원문 반환
+ * 여러 중국어 텍스트를 단일 API 호출로 배치 번역
  */
 export async function translateZhToKoBatch(texts: string[]): Promise<string[]> {
   if (texts.length === 0) return [];
@@ -56,10 +55,6 @@ export async function translateZhToKoBatch(texts: string[]): Promise<string[]> {
     return [await translateZhToKo(texts[0])];
   }
 
-  const token = process.env.HF_API_TOKEN;
-  if (!token) return texts;
-
-  // 번호 붙여서 전송, 파싱 실패 시 원문 반환
   const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join('\n');
   const maxTokens = texts.length * 60 + 100;
 
@@ -71,9 +66,8 @@ export async function translateZhToKoBatch(texts: string[]): Promise<string[]> {
 
   if (!result) return texts;
 
-  // "1. xxx" 형식 파싱
   const lines = result.split('\n');
-  const parsed: string[] = [...texts]; // fallback to original
+  const parsed: string[] = [...texts];
 
   for (const line of lines) {
     const match = line.match(/^(\d+)\.\s*(.+)/);

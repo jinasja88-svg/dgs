@@ -1,14 +1,36 @@
-import { LRUCache } from '@/lib/tmapi/cache';
+import { createAdminClient } from '@/lib/supabase-admin';
 
-// 번역 캐시: 최대 2000개 항목, TTL 24시간
-export const translationCache = new LRUCache(2000);
-
-export const TRANSLATION_TTL = 24 * 60 * 60 * 1000; // 24h
-
-export function getCached(text: string, direction: 'zh2ko' | 'ko2zh'): string | null {
-  return translationCache.get<string>(`${direction}:${text}`);
+export function getCached(_text: string, _direction: 'zh2ko' | 'ko2zh'): string | null {
+  // Supabase 기반 캐시는 비동기이므로 getCachedAsync 사용
+  return null;
 }
 
-export function setCached(text: string, direction: 'zh2ko' | 'ko2zh', translated: string): void {
-  translationCache.set(`${direction}:${text}`, translated, TRANSLATION_TTL);
+export function setCached(_text: string, _direction: 'zh2ko' | 'ko2zh', _translated: string): void {
+  // Supabase 기반 캐시는 비동기이므로 setCachedAsync 사용
+}
+
+export async function getCachedAsync(text: string, direction: 'zh2ko' | 'ko2zh'): Promise<string | null> {
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('translation_cache')
+      .select('translated')
+      .eq('direction', direction)
+      .eq('original', text)
+      .single();
+    return data?.translated ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedAsync(text: string, direction: 'zh2ko' | 'ko2zh', translated: string): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    await supabase
+      .from('translation_cache')
+      .upsert({ original: text, direction, translated }, { onConflict: 'direction,original' });
+  } catch {
+    // 캐시 저장 실패는 무시
+  }
 }

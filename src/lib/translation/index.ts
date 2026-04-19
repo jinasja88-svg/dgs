@@ -1,29 +1,26 @@
 /**
  * 1688 상품 한국어 번역 모듈
- * - 상품명: Papago API (캐시 우선)
- * - SKU 속성: 정적 룩업 우선 → 미스 시 Papago
+ * - 상품명: HuggingFace Qwen API (Supabase 캐시 우선)
+ * - SKU 속성: 정적 룩업 우선 → 미스 시 API
  */
 
 import type { SourcingProduct } from '@/types';
 import { translateZhToKo, translateKoToZh, translateZhToKoBatch } from './papago';
 import { lookupZhToKo, containsChinese, containsKorean } from './lookup';
-import { getCached, setCached } from './cache';
+import { getCachedAsync, setCachedAsync } from './cache';
 
-// 캐시를 통한 중국어→한국어 번역 (단일 텍스트)
+// Supabase 캐시를 통한 중국어→한국어 번역 (단일 텍스트)
 async function zhToKoCached(text: string): Promise<string> {
   if (!text || !containsChinese(text)) return text;
 
-  const cached = getCached(text, 'zh2ko');
+  const lookup = lookupZhToKo(text);
+  if (lookup !== null) return lookup;
+
+  const cached = await getCachedAsync(text, 'zh2ko');
   if (cached !== null) return cached;
 
-  const lookup = lookupZhToKo(text);
-  if (lookup !== null) {
-    setCached(text, 'zh2ko', lookup);
-    return lookup;
-  }
-
   const translated = await translateZhToKo(text);
-  setCached(text, 'zh2ko', translated);
+  await setCachedAsync(text, 'zh2ko', translated);
   return translated;
 }
 
@@ -36,11 +33,11 @@ export async function translateSingle(text: string): Promise<string> {
 export async function translateSearchQuery(keyword: string): Promise<string> {
   if (!keyword || !containsKorean(keyword)) return keyword;
 
-  const cached = getCached(keyword, 'ko2zh');
+  const cached = await getCachedAsync(keyword, 'ko2zh');
   if (cached !== null) return cached;
 
   const translated = await translateKoToZh(keyword);
-  setCached(keyword, 'ko2zh', translated);
+  await setCachedAsync(keyword, 'ko2zh', translated);
   return translated;
 }
 
@@ -71,38 +68,42 @@ export async function translateProducts(
 ): Promise<SourcingProduct[]> {
   if (products.length === 0) return products;
 
-  // 타이틀 배치 번역: 캐시 미스인 것만 단일 API 호출
-  const titlesToTranslate: { idx: number; text: string }[] = [];
+  // 타이틀 캐시 조회 (Supabase 병렬)
+  const cacheResults = await Promise.all(
+    products.map(async (p) => {
+      const title = p.title;
+      if (!title || !containsChinese(title)) return { cached: title, needsApi: false };
+      const lookup = lookupZhToKo(title);
+      if (lookup !== null) return { cached: lookup, needsApi: false };
+      const cached = await getCachedAsync(title, 'zh2ko');
+      return cached !== null ? { cached, needsApi: false } : { cached: title, needsApi: true };
+    })
+  );
+
+  // 캐시 미스 타이틀만 배치 API 호출
   const titleResults: string[] = products.map((p) => p.title);
+  const toTranslate: { idx: number; text: string }[] = [];
 
   for (let i = 0; i < products.length; i++) {
-    const title = products[i].title;
-    if (!title || !containsChinese(title)) continue;
-
-    const cached = getCached(title, 'zh2ko');
-    if (cached !== null) {
-      titleResults[i] = cached;
-      continue;
+    if (!cacheResults[i].needsApi) {
+      titleResults[i] = cacheResults[i].cached;
+    } else {
+      toTranslate.push({ idx: i, text: products[i].title });
     }
-    const lookup = lookupZhToKo(title);
-    if (lookup !== null) {
-      setCached(title, 'zh2ko', lookup);
-      titleResults[i] = lookup;
-      continue;
-    }
-    titlesToTranslate.push({ idx: i, text: title });
   }
 
-  // 캐시 미스 타이틀만 한 번에 번역
-  if (titlesToTranslate.length > 0) {
-    const batchTexts = titlesToTranslate.map((t) => t.text);
-    const batchResults = await translateZhToKoBatch(batchTexts);
-    for (let j = 0; j < titlesToTranslate.length; j++) {
-      const { idx, text } = titlesToTranslate[j];
-      const translated = batchResults[j];
-      setCached(text, 'zh2ko', translated);
-      titleResults[idx] = translated;
-    }
+  if (toTranslate.length > 0) {
+    const batchTexts = toTranslate.map((t) => t.text);
+    const batchTranslated = await translateZhToKoBatch(batchTexts);
+
+    // 캐시 저장 + 결과 반영 (병렬)
+    await Promise.all(
+      toTranslate.map(async ({ idx, text }, j) => {
+        const translated = batchTranslated[j];
+        titleResults[idx] = translated;
+        await setCachedAsync(text, 'zh2ko', translated);
+      })
+    );
   }
 
   // skipSkus일 때는 타이틀만 교체하여 반환
@@ -119,7 +120,6 @@ export async function translateProducts(
 }
 
 async function translateProduct(product: SourcingProduct, skipSkus = false): Promise<SourcingProduct> {
-  // title + seller.location 동시에 번역
   const sellerHasChinese = !!(product.seller?.location && containsChinese(product.seller.location));
   const [titleKo, locationKo] = await Promise.all([
     zhToKoCached(product.title),
@@ -139,7 +139,6 @@ async function translateProduct(product: SourcingProduct, skipSkus = false): Pro
     };
   }
 
-  // SKU 번역 (상세 페이지에서만 실행)
   const translatedSkus = await Promise.all(
     product.skus.map(async (sku) => {
       const translatedProperties = sku.properties
