@@ -27,6 +27,14 @@ function fmtPercent(n: number | null | undefined): string {
   return `${n.toFixed(1)}%`;
 }
 
+// ROAS 색상 헬퍼
+function roasClass(roas: number | null): string {
+  if (roas == null) return '';
+  if (roas < 10) return 'text-green-600 font-semibold';
+  if (roas < 20) return 'text-orange-500 font-semibold';
+  return 'text-red-500 font-semibold';
+}
+
 // ---------------------
 // 정렬 옵션
 // ---------------------
@@ -56,6 +64,20 @@ export default function CoupangPage() {
   const [minViews, setMinViews] = useState('');
   const [maxReviews, setMaxReviews] = useState('');
   const [excludeBrands, setExcludeBrands] = useState(true);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [minSales, setMinSales] = useState('');
+
+  // 즐겨찾기
+  const [favs, setFavs] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      return new Set(JSON.parse(localStorage.getItem('coupang-favs') || '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+  const [favOnly, setFavOnly] = useState(false);
 
   // 정렬
   const [sortKey, setSortKey] = useState<CoupangSortKey>('view_count');
@@ -82,13 +104,16 @@ export default function CoupangPage() {
 
   // 상품 목록
   const { data, isLoading, isFetching } = useQuery<PaginatedResponse<CoupangProduct>>({
-    queryKey: ['coupang-products', keyword, category, minViews, maxReviews, excludeBrands, sortKey, sortAsc, page],
+    queryKey: ['coupang-products', keyword, category, minViews, maxReviews, excludeBrands, minPrice, maxPrice, minSales, sortKey, sortAsc, page],
     queryFn: () => {
       const params = new URLSearchParams();
       if (keyword) params.set('keyword', keyword);
       if (category) params.set('category', category);
       if (minViews) params.set('min_views', minViews);
       if (maxReviews) params.set('max_reviews', maxReviews);
+      if (minPrice) params.set('min_price', minPrice);
+      if (maxPrice) params.set('max_price', maxPrice);
+      if (minSales) params.set('min_sales', minSales);
       params.set('exclude_brands', String(excludeBrands));
       params.set('sort', sortKey);
       params.set('order', sortAsc ? 'asc' : 'desc');
@@ -139,8 +164,18 @@ export default function CoupangPage() {
     }, 1500);
   }, []);
 
+  const toggleFav = useCallback((id: string) => {
+    setFavs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem('coupang-favs', JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
   const shipFee = getShipFee(deliveryType, rocketSize);
   const products = data?.data || [];
+  const displayProducts = favOnly ? products.filter((p) => favs.has(p.id)) : products;
 
   return (
     <div className="max-w-full px-4 py-6 md:px-6">
@@ -171,7 +206,7 @@ export default function CoupangPage() {
           <Button onClick={handleSearch} size="sm">검색</Button>
         </div>
 
-        {/* 필터 옵션 */}
+        {/* 필터 옵션 — 행 1 */}
         <div className="flex flex-wrap gap-2 items-center text-sm">
           <select
             value={category}
@@ -208,6 +243,45 @@ export default function CoupangPage() {
             />
             <span className="text-text-secondary">대기업 제외</span>
           </label>
+
+          <button
+            onClick={() => setFavOnly((v) => !v)}
+            className={cn(
+              'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+              favOnly ? 'bg-yellow-400 text-white' : 'bg-surface text-text-secondary hover:bg-yellow-50'
+            )}
+          >
+            ★ 즐겨찾기만
+          </button>
+        </div>
+
+        {/* 필터 옵션 — 행 2: 가격/판매량 범위 */}
+        <div className="flex flex-wrap gap-2 items-center text-sm border-t border-border-light pt-3">
+          <span className="text-text-tertiary font-medium text-xs">가격:</span>
+          <input
+            type="number"
+            value={minPrice}
+            onChange={(e) => { setMinPrice(e.target.value); setPage(1); }}
+            placeholder="최소가"
+            className="w-24 px-2 py-1.5 border border-border-light rounded-[var(--radius-md)] text-sm"
+          />
+          <span className="text-text-tertiary text-xs">~</span>
+          <input
+            type="number"
+            value={maxPrice}
+            onChange={(e) => { setMaxPrice(e.target.value); setPage(1); }}
+            placeholder="최대가"
+            className="w-24 px-2 py-1.5 border border-border-light rounded-[var(--radius-md)] text-sm"
+          />
+
+          <span className="text-text-tertiary font-medium text-xs ml-3">월판매:</span>
+          <input
+            type="number"
+            value={minSales}
+            onChange={(e) => { setMinSales(e.target.value); setPage(1); }}
+            placeholder="최소 판매량"
+            className="w-28 px-2 py-1.5 border border-border-light rounded-[var(--radius-md)] text-sm"
+          />
         </div>
 
         {/* 배송 옵션 */}
@@ -255,6 +329,7 @@ export default function CoupangPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-surface border-b border-border-light">
+              <th className="px-2 py-2.5 text-center font-medium text-text-tertiary w-8">★</th>
               <th className="px-3 py-2.5 text-left font-medium text-text-tertiary w-12">#</th>
               <th className="px-3 py-2.5 text-left font-medium text-text-tertiary min-w-[200px]">상품</th>
               <th className="px-3 py-2.5 text-left font-medium text-text-tertiary">카테고리</th>
@@ -287,19 +362,19 @@ export default function CoupangPage() {
             {isLoading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <tr key={i} className="border-b border-border-light">
-                  <td colSpan={14} className="px-3 py-3">
+                  <td colSpan={15} className="px-3 py-3">
                     <Skeleton className="h-8 w-full" />
                   </td>
                 </tr>
               ))
-            ) : products.length === 0 ? (
+            ) : displayProducts.length === 0 ? (
               <tr>
-                <td colSpan={14} className="px-3 py-12 text-center text-text-tertiary">
-                  검색 결과가 없습니다
+                <td colSpan={15} className="px-3 py-12 text-center text-text-tertiary">
+                  {favOnly ? '즐겨찾기한 상품이 없습니다' : '검색 결과가 없습니다'}
                 </td>
               </tr>
             ) : (
-              products.map((p, idx) => {
+              displayProducts.map((p, idx) => {
                 const commRate = getCommission(p.category);
                 const importCost = costMap[p.id] || 0;
                 const profit = importCost > 0 ? calcProfit(p.price, importCost, commRate, shipFee) : null;
@@ -308,6 +383,17 @@ export default function CoupangPage() {
 
                 return (
                   <tr key={p.id} className="border-b border-border-light hover:bg-surface/50 transition-colors">
+                    <td className="px-2 py-2 text-center">
+                      <button
+                        onClick={() => toggleFav(p.id)}
+                        className={cn(
+                          'text-lg leading-none transition-colors',
+                          favs.has(p.id) ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-300'
+                        )}
+                      >
+                        ★
+                      </button>
+                    </td>
                     <td className="px-3 py-2 text-text-tertiary text-xs">
                       {(page - 1) * perPage + idx + 1}
                     </td>
@@ -366,7 +452,7 @@ export default function CoupangPage() {
                     )}>
                       {margin != null ? `${margin}%` : '-'}
                     </td>
-                    <td className="px-3 py-2 text-right text-xs tabular-nums">
+                    <td className={cn('px-3 py-2 text-right text-xs tabular-nums', roasClass(roas))}>
                       {roas != null ? roas.toFixed(1) : '-'}
                     </td>
                     <td className="px-3 py-2 text-center">
