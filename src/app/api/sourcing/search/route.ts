@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getTmapiClient, tmapiCache, CACHE_TTL, mapSearchItemToSourcingProduct } from '@/lib/tmapi';
+import { getTmapiClient, CACHE_TTL, mapSearchItemToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
 import { translateProducts } from '@/lib/translation';
+import { getCached, setCached } from '@/lib/persistent-cache';
 import type { SourcingProduct } from '@/types';
 
 type SortOption = 'recommend' | 'sales' | 'price_up' | 'price_down' | 'rating' | 'repurchase';
@@ -98,8 +99,8 @@ export async function GET(request: NextRequest) {
 
   // 캐시 확인
   const tmapiSort = (isDefaultSearch && sort === 'recommend') ? 'sales' : getTmapiSort(sort);
-  const cacheKey = `search:${searchKeyword}:${page}:${perPage}:${sort}:${tmapiSort}`;
-  const cached = tmapiCache.get<unknown>(cacheKey);
+  const cacheKey = `tmapi:search:${searchKeyword}:${page}:${perPage}:${sort}:${tmapiSort}`;
+  const cached = await getCached<unknown>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
       total_pages: Math.ceil((result.total_count || products.length) / perPage),
     };
 
-    tmapiCache.set(cacheKey, responseBody, CACHE_TTL.SEARCH);
+    await setCached(cacheKey, responseBody, CACHE_TTL.SEARCH);
 
     return NextResponse.json(responseBody);
   } catch (err) {

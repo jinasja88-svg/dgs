@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getTmapiClient, tmapiCache, CACHE_TTL, mapImageSearchItemToSourcingProduct } from '@/lib/tmapi';
+import { getTmapiClient, CACHE_TTL, mapImageSearchItemToSourcingProduct } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
+import { getCached, setCached } from '@/lib/persistent-cache';
 
 export async function POST(request: NextRequest) {
   let body: { image_url?: string; page?: number };
@@ -17,8 +18,8 @@ export async function POST(request: NextRequest) {
   }
 
   // 캐시 확인
-  const cacheKey = `img-search:${image_url}:${page}`;
-  const cached = tmapiCache.get<unknown>(cacheKey);
+  const cacheKey = `tmapi:img-search:${image_url}:${page}`;
+  const cached = await getCached<unknown>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
       total_pages: Math.ceil((result.total_count || products.length) / 20),
     };
 
-    tmapiCache.set(cacheKey, responseBody, CACHE_TTL.IMAGE_SEARCH);
+    await setCached(cacheKey, responseBody, CACHE_TTL.IMAGE_SEARCH);
 
     return NextResponse.json(responseBody);
   } catch (err) {

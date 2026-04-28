@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getTmapiClient, tmapiCache, CACHE_TTL } from '@/lib/tmapi';
+import { getTmapiClient, CACHE_TTL } from '@/lib/tmapi';
 import { logApiCall } from '@/lib/api-logger';
-import { translateSingle } from '@/lib/translation';
-import { containsChinese } from '@/lib/translation/lookup';
+import { translateBatch } from '@/lib/translation';
+import { getCached, setCached } from '@/lib/persistent-cache';
 
 export async function GET(
   _request: NextRequest,
@@ -10,8 +10,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const cacheKey = `ratings:${id}`;
-  const cached = tmapiCache.get<unknown>(cacheKey);
+  const cacheKey = `tmapi:ratings:${id}`;
+  const cached = await getCached<unknown>(cacheKey);
   if (cached) return NextResponse.json(cached);
 
   try {
@@ -19,33 +19,22 @@ export async function GET(
     const result = await logApiCall('ratings', () => client.getItemRatings(id));
     const rawRatings = result?.list ?? [];
 
-    // 리뷰 내용 번역 (10개씩 배치)
-    const CONCURRENCY = 10;
-    const translated = [];
-    for (let i = 0; i < rawRatings.length; i += CONCURRENCY) {
-      const batch = rawRatings.slice(i, i + CONCURRENCY);
-      const batchTranslated = await Promise.all(
-        batch.map(async (r) => {
-          const content_zh = r.feedback;
-          const content = containsChinese(r.feedback)
-            ? await translateSingle(r.feedback)
-            : r.feedback;
-          return {
-            content,
-            content_zh,
-            star: Number(r.rate_star),
-            time: r.feedback_date,
-            sku_info: r.sku_map,
-            images: r.images,
-            user_name: r.user_nick,
-          };
-        })
-      );
-      translated.push(...batchTranslated);
-    }
+    // 리뷰 본문을 단일 배치 호출로 번역 (캐시 히트는 자동 스킵)
+    const feedbackTexts = rawRatings.map((r) => r.feedback ?? '');
+    const translatedTexts = await translateBatch(feedbackTexts);
+
+    const translated = rawRatings.map((r, i) => ({
+      content: translatedTexts[i] || r.feedback,
+      content_zh: r.feedback,
+      star: Number(r.rate_star),
+      time: r.feedback_date,
+      sku_info: r.sku_map,
+      images: r.images,
+      user_name: r.user_nick,
+    }));
 
     const response = { ratings: translated };
-    tmapiCache.set(cacheKey, response, CACHE_TTL.RATINGS);
+    await setCached(cacheKey, response, CACHE_TTL.RATINGS);
     return NextResponse.json(response);
   } catch (err) {
     console.error('Ratings error:', err);

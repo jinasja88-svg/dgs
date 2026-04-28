@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getTmapiClient, tmapiCache, CACHE_TTL, mapItemDetailToSourcingProduct } from '@/lib/tmapi';
+import { CACHE_TTL, mapItemDetailToSourcingProduct, getCachedItemDetail } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
-import { logApiCall } from '@/lib/api-logger';
+import { getCached, setCached } from '@/lib/persistent-cache';
+import type { SourcingProduct } from '@/types';
 
 export async function GET(
   _request: NextRequest,
@@ -9,26 +10,22 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  // 캐시 확인
-  const cacheKey = `detail:${id}`;
-  const cached = tmapiCache.get<unknown>(cacheKey);
+  const cacheKey = `tmapi:product:${id}`;
+  const cached = await getCached<SourcingProduct>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
 
   try {
-    const client = getTmapiClient();
-
-    // 환율 + TMAPI 상세(한국어) 병렬 실행
-    // TMAPI language=ko가 제목/SKU 속성을 한국어로 반환하므로 Papago 번역 불필요
+    // 환율 + TMAPI 상세(한국어) 병렬 실행. detail-raw 캐시는 product-desc와 공유됨.
     const [exchangeRate, detail] = await Promise.all([
       getExchangeRate(),
-      logApiCall('product', () => client.getItemDetail(id, 'ko')),
+      getCachedItemDetail(id, 'ko'),
     ]);
 
     const product = mapItemDetailToSourcingProduct(detail, exchangeRate);
 
-    tmapiCache.set(cacheKey, product, CACHE_TTL.DETAIL);
+    await setCached(cacheKey, product, CACHE_TTL.DETAIL);
 
     return NextResponse.json(product);
   } catch (err) {

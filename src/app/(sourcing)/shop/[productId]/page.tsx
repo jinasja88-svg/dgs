@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use, useEffect } from 'react';
+import { useState, use, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink, Star, MessageSquare } from 'lucide-react';
@@ -458,10 +458,30 @@ interface SiteReview {
   created_at: string;
 }
 
+function useInView(rootMargin = '200px') {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (inView) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setInView(true);
+      },
+      { rootMargin }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [inView, rootMargin]);
+  return { ref, inView };
+}
+
 function RatingsSection({ productId }: { productId: string }) {
   const [activeTab, setActiveTab] = useState<'1688' | 'site'>('1688');
   const [showAll1688, setShowAll1688] = useState(false);
   const [showAllSite, setShowAllSite] = useState(false);
+  const { ref: sectionRef, inView } = useInView();
 
   const { data: ratingsData, isLoading: isLoading1688 } = useQuery<{ ratings: TranslatedRating[] }>({
     queryKey: ['product-ratings', productId],
@@ -470,6 +490,7 @@ function RatingsSection({ productId }: { productId: string }) {
       return r.json();
     },
     staleTime: 30 * 60 * 1000,
+    enabled: inView,
   });
 
   const { data: siteData, isLoading: isLoadingSite } = useQuery<{ reviews: SiteReview[] }>({
@@ -479,12 +500,18 @@ function RatingsSection({ productId }: { productId: string }) {
       return r.json();
     },
     staleTime: 5 * 60 * 1000,
+    enabled: inView,
   });
 
   const ratings = ratingsData?.ratings || [];
   const siteReviews = siteData?.reviews || [];
 
   const isLoading = activeTab === '1688' ? isLoading1688 : isLoadingSite;
+
+  // 뷰포트 진입 전엔 sentinel만 두고 쿼리는 보류 — TMAPI/HF 호출 비용 절감
+  if (!inView) {
+    return <div ref={sectionRef} className="mt-8 min-h-[1px]" />;
+  }
 
   if (!isLoading1688 && !isLoadingSite && ratings.length === 0 && siteReviews.length === 0) return null;
 
@@ -679,6 +706,8 @@ function RatingsSection({ productId }: { productId: string }) {
 }
 
 function DetailSection({ productId }: { productId: string }) {
+  const { ref: sectionRef, inView } = useInView();
+
   const { data, isLoading } = useQuery<{ html: string }>({
     queryKey: ['product-desc', productId],
     queryFn: async () => {
@@ -686,7 +715,12 @@ function DetailSection({ productId }: { productId: string }) {
       return r.json();
     },
     staleTime: 15 * 60 * 1000,
+    enabled: inView,
   });
+
+  if (!inView) {
+    return <div ref={sectionRef} className="mt-8 min-h-[1px]" />;
+  }
 
   return (
     <div className="mt-8">

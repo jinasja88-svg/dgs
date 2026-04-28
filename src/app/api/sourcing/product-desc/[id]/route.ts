@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { getTmapiClient, tmapiCache, CACHE_TTL } from '@/lib/tmapi';
+import { CACHE_TTL, getCachedItemDetail } from '@/lib/tmapi';
+import { getCached, setCached } from '@/lib/persistent-cache';
 
 export async function GET(
   _request: NextRequest,
@@ -7,15 +8,15 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const cacheKey = `desc:${id}`;
-  const cached = tmapiCache.get<{ html: string }>(cacheKey);
+  const cacheKey = `tmapi:desc:${id}`;
+  const cached = await getCached<{ html: string }>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
 
   try {
-    const client = getTmapiClient();
-    const detail = await client.getItemDetail(id, 'zh');
+    // detail-raw 캐시는 /api/sourcing/product/[id] 와 공유 — 동시 호출 시 dedupe로 1콜
+    const detail = await getCachedItemDetail(id, 'ko');
 
     if (!detail.detail_url) {
       return NextResponse.json({ html: '' });
@@ -64,7 +65,7 @@ export async function GET(
     );
 
     const result = { html };
-    tmapiCache.set(cacheKey, result, CACHE_TTL.DETAIL);
+    await setCached(cacheKey, result, CACHE_TTL.DETAIL);
 
     return NextResponse.json(result);
   } catch (err) {

@@ -29,6 +29,49 @@ export async function translateSingle(text: string): Promise<string> {
   return zhToKoCached(text);
 }
 
+/**
+ * 다수 중국어 텍스트를 캐시(룩업+Supabase) 우선 + 미스만 단일 배치 API로 번역.
+ * 리뷰처럼 N개를 한 번에 처리해야 하는 경우 N콜이 1콜로 압축됨.
+ */
+export async function translateBatch(texts: string[]): Promise<string[]> {
+  if (texts.length === 0) return [];
+
+  const results: string[] = new Array(texts.length);
+  const toTranslate: { idx: number; text: string }[] = [];
+
+  await Promise.all(
+    texts.map(async (text, idx) => {
+      if (!text || !containsChinese(text)) {
+        results[idx] = text;
+        return;
+      }
+      const lookup = lookupZhToKo(text);
+      if (lookup !== null) {
+        results[idx] = lookup;
+        return;
+      }
+      const cached = await getCachedAsync(text, 'zh2ko');
+      if (cached !== null) {
+        results[idx] = cached;
+        return;
+      }
+      toTranslate.push({ idx, text });
+    })
+  );
+
+  if (toTranslate.length > 0) {
+    const batchTranslated = await translateZhToKoBatch(toTranslate.map((t) => t.text));
+    await Promise.all(
+      toTranslate.map(async ({ idx, text }, j) => {
+        results[idx] = batchTranslated[j];
+        await setCachedAsync(text, 'zh2ko', batchTranslated[j]);
+      })
+    );
+  }
+
+  return results;
+}
+
 // 한국어→중국어 번역 (검색 쿼리용)
 export async function translateSearchQuery(keyword: string): Promise<string> {
   if (!keyword || !containsKorean(keyword)) return keyword;
