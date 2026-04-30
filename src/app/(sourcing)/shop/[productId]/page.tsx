@@ -29,7 +29,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  // URL 파라미터의 min_order로 초기값 설정 — API 로드 전에도 올바른 최솟값으로 시작
+  const [quantity, setQuantity] = useState(() => {
+    const minOrderParam = searchParams.get('min_order');
+    return minOrderParam ? Math.max(1, parseInt(minOrderParam)) : 1;
+  });
   const [isOrdering, setIsOrdering] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -43,6 +47,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     const price_krw = searchParams.get('price_krw');
     const price_cny = searchParams.get('price_cny');
     const seller = searchParams.get('seller');
+    const min_order = searchParams.get('min_order');
     if (!title) return null;
     return {
       product_id: productId,
@@ -54,6 +59,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       skus: [],
       seller: seller ? { name: decodeURIComponent(seller) } : null,
       stock: 0,
+      min_order: min_order ? Math.max(1, parseInt(min_order)) : undefined,
     };
   })();
 

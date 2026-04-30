@@ -29,6 +29,9 @@ function buildHref(product: SourcingProduct): string {
     price_cny: String(product.price_cny),
     seller: product.seller?.name || '',
   });
+  if (product.min_order && product.min_order > 1) {
+    params.set('min_order', String(product.min_order));
+  }
   return `/shop/${product.product_id}?${params.toString()}`;
 }
 
