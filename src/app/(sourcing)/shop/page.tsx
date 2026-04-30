@@ -577,7 +577,7 @@ function ShopPageInner() {
       )}
 
       {/* Main: sidebar + results */}
-      <div className="flex gap-8">
+      <div className="flex gap-5 lg:gap-6">
         {/* Desktop sidebar */}
         {!imageResults && (
           <FilterSidebar

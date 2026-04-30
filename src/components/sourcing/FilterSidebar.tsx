@@ -54,12 +54,12 @@ export default function FilterSidebar({
                 'fixed top-0 bottom-0 left-0 z-50 w-[85%] max-w-sm bg-canvas overflow-y-auto lg:hidden transition-transform',
                 visible ? 'translate-x-0' : '-translate-x-full'
               )
-            : 'hidden lg:block'
+            : 'hidden lg:block w-36 flex-shrink-0'
         )}
       >
         <div
           className={cn(
-            isDrawer ? 'p-5' : 'bg-canvas border border-hairline rounded-[var(--radius-md)] p-5 sticky top-20'
+            isDrawer ? 'p-5' : 'bg-canvas border border-hairline rounded-[var(--radius-md)] p-3 sticky top-20'
           )}
         >
           {isDrawer ? (
@@ -70,14 +70,14 @@ export default function FilterSidebar({
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-ink">필터</h2>
+            <div className="flex items-center justify-between gap-1 mb-3">
+              <h2 className="text-sm font-semibold text-ink">필터</h2>
               {activeCount > 0 && (
                 <button
                   onClick={onReset}
-                  className="text-xs text-muted hover:text-ink underline"
+                  className="text-[11px] text-muted hover:text-ink underline whitespace-nowrap"
                 >
-                  {activeCount}개 적용 · 초기화
+                  {activeCount} · 초기화
                 </button>
               )}
             </div>
@@ -169,8 +169,8 @@ function Section({
   last?: boolean;
 }) {
   return (
-    <section className={cn('pb-5 mb-5', !last && 'border-b border-hairline-soft')}>
-      <h3 className="text-[15px] font-semibold text-ink mb-3">{title}</h3>
+    <section className={cn('pb-3 mb-3', !last && 'border-b border-hairline-soft')}>
+      <h3 className="text-[13px] font-semibold text-ink mb-2">{title}</h3>
       {children}
     </section>
   );
@@ -209,25 +209,25 @@ function PriceSection({
 
   return (
     <Section title="가격 범위">
-      <div className="flex items-center gap-1 mb-3">
+      <div className="flex items-center gap-1 mb-2">
         {(['KRW', 'CNY'] as const).map((cur) => (
           <button
             key={cur}
             onClick={() => onChange({ priceCurrency: cur })}
             className={cn(
-              'flex-1 h-8 rounded-[var(--radius-sm)] text-xs font-medium transition',
+              'flex-1 h-7 rounded-[var(--radius-sm)] text-[11px] font-medium transition',
               filters.priceCurrency === cur
                 ? 'bg-ink text-on-primary'
                 : 'bg-canvas text-ink border border-hairline hover:border-ink'
             )}
           >
-            {cur === 'KRW' ? '원화 (₩)' : '위안 (¥)'}
+            {cur === 'KRW' ? '₩' : '¥'}
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2">
-        <div className="flex-1 flex items-center border border-hairline rounded-[var(--radius-sm)] focus-within:border-ink focus-within:border-2 px-2.5">
-          <span className="text-sm text-muted">{currencySymbol}</span>
+      <div className="space-y-1.5">
+        <div className="flex items-center border border-hairline rounded-[var(--radius-sm)] focus-within:border-ink focus-within:border-2 px-2">
+          <span className="text-xs text-muted">{currencySymbol}</span>
           <input
             type="number"
             min="0"
@@ -235,12 +235,11 @@ function PriceSection({
             placeholder="최소"
             value={minStr}
             onChange={(e) => setMinStr(e.target.value)}
-            className="w-full h-9 pl-1 text-sm bg-transparent focus:outline-none placeholder:text-muted-soft"
+            className="w-full h-8 pl-1 text-xs bg-transparent focus:outline-none placeholder:text-muted-soft min-w-0"
           />
         </div>
-        <span className="text-muted">~</span>
-        <div className="flex-1 flex items-center border border-hairline rounded-[var(--radius-sm)] focus-within:border-ink focus-within:border-2 px-2.5">
-          <span className="text-sm text-muted">{currencySymbol}</span>
+        <div className="flex items-center border border-hairline rounded-[var(--radius-sm)] focus-within:border-ink focus-within:border-2 px-2">
+          <span className="text-xs text-muted">{currencySymbol}</span>
           <input
             type="number"
             min="0"
@@ -248,7 +247,7 @@ function PriceSection({
             placeholder="최대"
             value={maxStr}
             onChange={(e) => setMaxStr(e.target.value)}
-            className="w-full h-9 pl-1 text-sm bg-transparent focus:outline-none placeholder:text-muted-soft"
+            className="w-full h-8 pl-1 text-xs bg-transparent focus:outline-none placeholder:text-muted-soft min-w-0"
           />
         </div>
       </div>
@@ -277,7 +276,7 @@ function CheckboxList<T extends string>({
   };
 
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-1.5">
       {options.map((opt) => {
         const checked = set.has(opt.value);
         return (
@@ -285,17 +284,17 @@ function CheckboxList<T extends string>({
             <button
               type="button"
               onClick={() => toggle(opt.value)}
-              className="flex items-center gap-2.5 text-sm text-ink hover:underline w-full"
+              className="flex items-start gap-2 text-xs text-ink hover:underline w-full leading-snug"
             >
               <span
                 className={cn(
-                  'w-4 h-4 rounded-[3px] border flex items-center justify-center flex-shrink-0',
+                  'w-4 h-4 rounded-[3px] border flex items-center justify-center flex-shrink-0 mt-0.5',
                   checked ? 'bg-ink border-ink' : 'bg-canvas border-border-strong'
                 )}
               >
                 {checked && <Check className="w-3 h-3 text-on-primary" strokeWidth={3} />}
               </span>
-              <span className="text-left">{opt.label}</span>
+              <span className="text-left break-keep">{opt.label}</span>
             </button>
           </li>
         );
@@ -316,7 +315,7 @@ function RadioList<T extends string>({
   renderIcon?: (opt: { value: T; label: string }) => React.ReactNode;
 }) {
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-1.5">
       {options.map((opt) => {
         const selected = value === opt.value;
         return (
@@ -324,7 +323,7 @@ function RadioList<T extends string>({
             <button
               type="button"
               onClick={() => onChange(opt.value)}
-              className="flex items-center gap-2.5 text-sm text-ink hover:underline w-full"
+              className="flex items-center gap-2 text-xs text-ink hover:underline w-full"
             >
               <span
                 className={cn(
