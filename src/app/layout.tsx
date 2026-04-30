@@ -7,7 +7,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#256ef4',
+  themeColor: '#ff385c',
 };
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     default: '딸깍소싱 - 1688 중국 소싱 대행',
     template: '%s | 딸깍소싱',
   },
-  description: '원클릭으로 쉽고 투명한 1688 중국 소싱 대행 플랫폼. 12% 수수료, 실시간 환율, 배송 추적까지.',
+  description: '원클릭으로 쉽고 투명한 1688 중국 소싱 대행 플랫폼. 단일 단가, 실시간 환율, 배송 추적까지.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

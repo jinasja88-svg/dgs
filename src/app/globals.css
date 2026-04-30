@@ -10,105 +10,127 @@
 }
 
 @theme inline {
-  /* === KRDS Color Tokens === */
-  /* Primary (Government Blue) */
-  --color-primary-5: #ecf2fe;
-  --color-primary-10: #d8e5fd;
-  --color-primary-20: #b1cefb;
-  --color-primary-30: #86aff9;
-  --color-primary-40: #4c87f6;
-  --color-primary: #256ef4;
-  --color-primary-60: #0b50d0;
-  --color-primary-70: #083891;
-  --color-primary-80: #052561;
+  /* === Brand & Accent — Rausch (DESIGN.md §2) === */
+  --color-primary: #ff385c;
+  --color-primary-active: #e00b41;
+  --color-primary-disabled: #ffd1da;
+  --color-primary-hover-bg: #fff1f3;
 
-  /* Secondary */
-  --color-secondary-5: #eef2f7;
-  --color-secondary-10: #d6e0eb;
-  --color-secondary-20: #bacbde;
-  --color-secondary-40: #6b96c7;
-  --color-secondary-60: #1c589c;
-  --color-secondary-70: #063a74;
-  --color-secondary-80: #052b57;
+  /* Legacy primary ramp aliases — gradually decommission */
+  --color-primary-5: var(--color-primary-hover-bg);
+  --color-primary-10: #ffe1e7;
+  --color-primary-20: #ffc4ce;
+  --color-primary-30: #ffa6b5;
+  --color-primary-40: #ff7587;
+  --color-primary-60: var(--color-primary-active);
+  --color-primary-70: #b80835;
+  --color-primary-80: #8a0628;
 
-  /* Gray (Blue Gray) */
-  --color-gray-0: #ffffff;
-  --color-gray-5: #f4f5f6;
-  --color-gray-10: #e6e8ea;
-  --color-gray-20: #cdd1d5;
-  --color-gray-30: #b1b8be;
-  --color-gray-40: #8a949e;
-  --color-gray-50: #6d7882;
-  --color-gray-60: #58616a;
-  --color-gray-70: #464c53;
-  --color-gray-80: #33363d;
-  --color-gray-90: #1e2124;
-  --color-gray-95: #131416;
+  /* Point — collapsed into primary (DESIGN.md §8.1) */
+  --color-point: var(--color-primary);
+  --color-point-5: var(--color-primary-hover-bg);
 
-  /* Status Colors */
-  --color-danger: #de3412;
-  --color-danger-5: #fdefec;
-  --color-danger-10: #fcdfd9;
-  --color-danger-60: #bd2c0f;
+  /* === Surface (DESIGN.md §2) === */
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #f2f2f2;
 
-  --color-warning: #ffb114;
-  --color-warning-5: #fff3db;
-  --color-warning-60: #8a5c00;
+  /* === Hairlines & Borders (DESIGN.md §2) === */
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+  --color-border-strong: #c1c1c1;
 
-  --color-success: #228738;
-  --color-success-5: #eaf6ec;
-  --color-success-60: #267337;
+  /* === Text (DESIGN.md §2) === */
+  --color-ink: #222222;
+  --color-body: #3f3f3f;
+  --color-muted: #6a6a6a;
+  --color-muted-soft: #929292;
+  --color-on-primary: #ffffff;
 
+  /* === Semantic (DESIGN.md §2) === */
+  --color-error: #c13515;
+  --color-error-hover: #b32505;
+  --color-success: #0e7c3a;
+  --color-success-5: #e8f5ee;
+  --color-success-60: #0a5a2a;
   --color-info: #0b78cb;
   --color-info-5: #e7f4fe;
   --color-info-60: #096ab3;
+  --color-warning: #b86e00;
+  --color-warning-5: #fff3db;
+  --color-warning-60: #8a5c00;
+  --color-legal-link: #428bff;
 
-  /* Point (Government Red) */
-  --color-point: #d63d4a;
-  --color-point-5: #fbeff0;
+  /* Legacy danger alias → error */
+  --color-danger: var(--color-error);
+  --color-danger-5: #fdefec;
+  --color-danger-10: #fcdfd9;
+  --color-danger-60: var(--color-error-hover);
 
-  /* Semantic Aliases */
-  --color-surface: var(--color-gray-5);
-  --color-surface-subtle: var(--color-gray-10);
-  --color-background: var(--color-gray-0);
-  --color-text-primary: var(--color-gray-95);
-  --color-text-secondary: var(--color-gray-70);
-  --color-text-tertiary: var(--color-gray-50);
-  --color-text-disabled: var(--color-gray-40);
-  --color-border: var(--color-gray-20);
-  --color-border-light: var(--color-gray-10);
-  --color-border-dark: var(--color-gray-60);
-  /* Fonts - KRDS: Pretendard GOV */
-  --font-body: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* === Legacy gray ramp — slimmed surface/text mapping === */
+  --color-gray-0: var(--color-canvas);
+  --color-gray-5: var(--color-surface-soft);
+  --color-gray-10: var(--color-hairline-soft);
+  --color-gray-20: var(--color-hairline);
+  --color-gray-30: var(--color-border-strong);
+  --color-gray-40: var(--color-muted-soft);
+  --color-gray-50: var(--color-muted);
+  --color-gray-60: var(--color-body);
+  --color-gray-70: var(--color-body);
+  --color-gray-80: #2a2a2a;
+  --color-gray-90: var(--color-ink);
+  --color-gray-95: var(--color-ink);
 
-  /* KRDS Border Radius */
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
+  /* === Semantic Aliases (compatibility) === */
+  --color-surface: var(--color-canvas);
+  --color-surface-subtle: var(--color-surface-soft);
+  --color-background: var(--color-canvas);
+  --color-text-primary: var(--color-ink);
+  --color-text-secondary: var(--color-body);
+  --color-text-tertiary: var(--color-muted);
+  --color-text-disabled: var(--color-muted-soft);
+  --color-border: var(--color-hairline);
+  --color-border-light: var(--color-hairline-soft);
+  --color-border-dark: var(--color-border-strong);
 
-  /* KRDS Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.08);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 8px 16px -2px rgba(0, 0, 0, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.06);
-  --shadow-xl: 0 16px 24px -4px rgba(0, 0, 0, 0.12), 0 8px 12px -4px rgba(0, 0, 0, 0.08);
+  /* === Fonts === */
+  --font-body: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", "Apple SD Gothic Neo", sans-serif;
 
-  /* KRDS Spacing (8pt grid) */
-  --space-1: 0.1rem;
-  --space-2: 0.2rem;
-  --space-3: 0.4rem;
-  --space-4: 0.6rem;
-  --space-5: 0.8rem;
+  /* === Border Radius (DESIGN.md §8.2) === */
+  --radius-xs: 4px;
+  --radius-sm: 8px;     /* buttons / inputs */
+  --radius-md: 14px;    /* cards */
+  --radius-lg: 14px;    /* alias */
+  --radius-xl: 32px;    /* category chips */
+
+  /* === Shadow — single tier (DESIGN.md §5) === */
+  --shadow-float:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+
+  /* Legacy shadow aliases — all collapsed to float */
+  --shadow-sm: var(--shadow-float);
+  --shadow-card: var(--shadow-float);
+  --shadow-card-hover: var(--shadow-float);
+  --shadow-md: var(--shadow-float);
+  --shadow-lg: var(--shadow-float);
+  --shadow-xl: var(--shadow-float);
+
+  /* === Spacing (4px base, DESIGN.md §4) === */
+  --space-1: 0.125rem;  /* 2px (xxs) */
+  --space-2: 0.25rem;   /* 4px (xs) */
+  --space-3: 0.5rem;    /* 8px (sm) */
+  --space-4: 0.75rem;   /* 12px (md) */
+  --space-5: 1rem;      /* 16px (base) */
   --space-6: 1rem;
-  --space-7: 1.2rem;
-  --space-8: 1.6rem;
-  --space-9: 2rem;
-  --space-10: 2.4rem;
+  --space-7: 1.25rem;
+  --space-8: 1.5rem;    /* 24px (lg) */
+  --space-9: 2rem;      /* 32px (xl) */
+  --space-10: 3rem;     /* 48px (xxl) */
+  --space-section: 4rem; /* 64px */
 
-  /* Animations */
+  /* === Animations === */
   --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
   --animate-fade-in: fade-in 0.3s ease-out forwards;
   --animate-slide-in-right: slide-in-right 0.25s ease-out forwards;
@@ -147,23 +169,24 @@
   to { transform: rotate(360deg); }
 }
 
-/* KRDS Base Styles */
+/* === Base Styles (DESIGN.md §3) === */
 body {
   font-family: var(--font-body);
-  font-size: 17px;
-  line-height: 150%;
-  color: var(--color-text-primary);
-  background: var(--color-background);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  background: var(--color-canvas);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* KRDS Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-body);
-  font-weight: 700;
-  line-height: 150%;
-}
+/* DESIGN.md §3 — display headings keep modest weight; only rating-display goes 700 */
+h1 { font-size: 28px; font-weight: 700; line-height: 1.43; letter-spacing: -0.3px; font-family: var(--font-body); }
+h2 { font-size: 22px; font-weight: 600; line-height: 1.2;  letter-spacing: -0.4px; font-family: var(--font-body); }
+h3 { font-size: 21px; font-weight: 700; line-height: 1.43; font-family: var(--font-body); }
+h4 { font-size: 20px; font-weight: 600; line-height: 1.2;  letter-spacing: -0.18px; font-family: var(--font-body); }
+h5 { font-size: 16px; font-weight: 600; line-height: 1.25; font-family: var(--font-body); }
+h6 { font-size: 16px; font-weight: 500; line-height: 1.25; font-family: var(--font-body); }
 
 /* Animation delays */
 .delay-1 { animation-delay: 0.1s; }
@@ -172,11 +195,15 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--color-surface); }
-::-webkit-scrollbar-thumb { background: var(--color-gray-30); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--color-surface-soft); }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
 
-/* Focus visible - KRDS 접근성 */
+/* DESIGN.md §6.2 — pill components hide scrollbars in horizontal nav */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Focus visible (DESIGN.md §6.7 — no glow, hairline-thick ink border instead) */
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }

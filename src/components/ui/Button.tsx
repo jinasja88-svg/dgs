@@ -4,7 +4,7 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
-type Variant = 'primary' | 'secondary' | 'tertiary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'tertiary' | 'ghost' | 'danger' | 'pillRausch' | 'pillGhost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,19 +13,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
-/* KRDS Button Styles */
+/* DESIGN.md §6.1 — Rausch primary, ink secondary, hairline ghost */
 const variantStyles: Record<Variant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-60 active:bg-primary-70',
-  secondary: 'bg-primary-5 text-primary border border-primary hover:bg-primary-10 active:bg-primary-20',
-  tertiary: 'bg-transparent text-text-secondary border border-border-dark hover:bg-gray-5 active:bg-gray-10',
-  ghost: 'text-text-secondary hover:bg-secondary-5 active:bg-secondary-10',
-  danger: 'bg-danger text-white hover:bg-danger-60 active:bg-danger-60',
+  primary: 'bg-primary text-on-primary hover:bg-primary-active rounded-[var(--radius-sm)]',
+  secondary: 'bg-canvas text-ink border border-ink hover:bg-surface-soft rounded-[var(--radius-sm)]',
+  tertiary: 'bg-transparent text-ink hover:underline rounded-[var(--radius-sm)]',
+  ghost: 'bg-transparent text-ink hover:bg-surface-soft rounded-[var(--radius-sm)]',
+  danger: 'bg-error text-on-primary hover:bg-error-hover rounded-[var(--radius-sm)]',
+  pillRausch: 'bg-primary text-on-primary hover:bg-primary-active rounded-full',
+  pillGhost: 'bg-canvas text-ink border border-hairline hover:border-ink rounded-full',
 };
 
 const sizeStyles: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-[15px] rounded-[var(--radius-sm)]',
-  md: 'px-5 py-2.5 text-[15px] rounded-[var(--radius-md)]',
-  lg: 'px-7 py-3 text-[17px] rounded-[var(--radius-md)]',
+  sm: 'px-4 py-2 text-sm',
+  md: 'px-5 py-2.5 text-[15px]',
+  lg: 'px-6 py-3 text-base h-12',
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -34,8 +36,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center font-bold leading-[150%] transition-colors duration-200 cursor-pointer',
-          'disabled:bg-gray-20 disabled:text-gray-50 disabled:border-gray-30 disabled:cursor-not-allowed',
+          'inline-flex items-center justify-center font-medium leading-[1.25] transition-colors duration-200 cursor-pointer',
+          'disabled:bg-primary-disabled disabled:text-on-primary disabled:cursor-not-allowed',
           variantStyles[variant],
           sizeStyles[size],
           className

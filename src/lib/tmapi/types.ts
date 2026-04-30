@@ -34,10 +34,17 @@ export interface TmapiSearchItem {
   quantity_begin: string;
   sale_info: {
     sale_quantity_90days: string;
+    /** ISO 등록일 (필드가 응답에 있을 때만) */
+    date_added?: string;
+    is_new?: boolean;
   };
   delivery_info: {
     area_from: string[];
     free_shipping: boolean;
+    /** "0.95" 등 — 24h/48h 발송 비율 (필드가 응답에 있을 때만) */
+    delivery_24h_rate?: string;
+    delivery_48h_rate?: string;
+    is_24h_delivery?: boolean;
   };
   shop_info: {
     company_name: string;
@@ -46,8 +53,11 @@ export interface TmapiSearchItem {
     score_info?: {
       composite_score: string;
     };
+    is_plus?: boolean;
   };
   item_repurchase_rate: string;
+  /** "1688Select", "7daysReturn", "qualityAssurance" 등 */
+  service_tags?: string[];
   is_ad?: boolean;
 }
 

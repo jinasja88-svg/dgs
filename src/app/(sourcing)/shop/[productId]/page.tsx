@@ -72,11 +72,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   const displayProduct = product || fallbackProduct || null;
 
   const selectedSkuData = displayProduct?.skus?.find((s) => s.sku_id === selectedSku);
+  // price_krw is the displayed Ddalkkak unit price (margin baked in by mapper).
   const currentPrice = selectedSkuData?.price_krw || displayProduct?.price_krw || 0;
   const currentPriceCny = selectedSkuData?.price_cny || displayProduct?.price_cny || 0;
-  const serviceFee = Math.round(currentPrice * quantity * 0.12);
   const shippingFee = 3000;
-  const totalPrice = currentPrice * quantity + serviceFee + shippingFee;
+  const totalPrice = currentPrice * quantity + shippingFee;
 
   useEffect(() => {
     const supabase = createClient();
@@ -218,7 +218,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
           ],
           total_cny: currentPriceCny * quantity,
           total_krw: currentPrice * quantity,
-          service_fee: serviceFee,
           shipping_fee: shippingFee,
         }),
       });
@@ -379,20 +378,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
             </div>
 
             {/* Price breakdown */}
-            <div className="bg-surface rounded-[var(--radius-lg)] p-4 mb-6 space-y-2 text-sm">
+            <div className="bg-surface-soft rounded-[var(--radius-md)] p-4 mb-6 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-text-secondary">상품 금액</span>
+                <span className="text-muted">상품 금액</span>
                 <span>{formatPrice(currentPrice * quantity)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-secondary">서비스 수수료 (12%)</span>
-                <span>{formatPrice(serviceFee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">국내 배송비</span>
+                <span className="text-muted">국내 배송비</span>
                 <span>{formatPrice(shippingFee)}</span>
               </div>
-              <div className="border-t border-border pt-2 flex justify-between font-bold text-base">
+              <div className="border-t border-hairline pt-2 flex justify-between font-bold text-base">
                 <span>총 결제 금액</span>
                 <span className="text-primary">{formatPrice(totalPrice)}</span>
               </div>

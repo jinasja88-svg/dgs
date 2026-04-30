@@ -119,6 +119,33 @@ export interface SourcingProduct {
   category?: string;
   min_order?: number;
   detail_url?: string;
+  // ─ Phase 1: 신뢰 시그널 / 배지 ─
+  badges?: SourcingBadge[];
+  is_new?: boolean;
+  ships_in_24h?: boolean;
+  ships_in_48h?: boolean;
+  is_1688_select?: boolean;
+  is_super_factory?: boolean;
+  free_shipping?: boolean;
+  return_in_7d?: boolean;
+  is_ad?: boolean;
+}
+
+export type SourcingBadgeTone = 'primary' | 'ink' | 'success' | 'muted';
+export type SourcingBadgeType =
+  | 'new_7d'
+  | 'new_30d'
+  | 'select_1688'
+  | 'super_factory'
+  | 'plus'
+  | 'free_shipping'
+  | 'return_7d'
+  | 'bestseller';
+
+export interface SourcingBadge {
+  type: SourcingBadgeType;
+  label: string;
+  tone: SourcingBadgeTone;
 }
 
 export interface SourcingSku {

@@ -9,6 +9,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   helperText?: string;
 }
 
+/* DESIGN.md §6.7 — hairline outline, focus thickens to 2px ink (no glow) */
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, helperText, className, id, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
@@ -16,7 +17,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-text-primary">
+          <label htmlFor={inputId} className="text-sm font-medium text-muted">
             {label}
           </label>
         )}
@@ -24,17 +25,17 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            'w-full px-4 py-2.5 border rounded-[var(--radius-md)] text-[15px] text-text-primary bg-white transition-colors',
-            'placeholder:text-text-tertiary',
-            'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
-            'disabled:bg-gray-5 disabled:text-text-disabled disabled:cursor-not-allowed',
-            error ? 'border-danger' : 'border-border',
+            'w-full px-3.5 py-3 border rounded-[var(--radius-sm)] text-base text-ink bg-canvas transition-colors',
+            'placeholder:text-muted-soft',
+            'focus:outline-none focus:border-2 focus:border-ink focus:px-[13px] focus:py-[11px]',
+            'disabled:bg-surface-soft disabled:text-muted-soft disabled:cursor-not-allowed',
+            error ? 'border-error' : 'border-hairline',
             className
           )}
           {...props}
         />
-        {error && <p className="text-xs text-danger">{error}</p>}
-        {helperText && !error && <p className="text-xs text-text-tertiary">{helperText}</p>}
+        {error && <p className="text-sm text-error">{error}</p>}
+        {helperText && !error && <p className="text-sm text-muted">{helperText}</p>}
       </div>
     );
   }

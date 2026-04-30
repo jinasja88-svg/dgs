@@ -11,7 +11,6 @@ import { formatPrice } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import type { SourcingCartItem } from '@/types';
 
-const SERVICE_FEE_RATE = 0.12;
 const SHIPPING_FEE = 3000;
 
 export default function CartPage() {
@@ -43,10 +42,11 @@ export default function CartPage() {
     reload();
   };
 
+  // price_krw is already the displayed Ddalkkak unit price (margin baked in by mapper).
+  // Backend reconciliation stays unchanged — see /api/sourcing/orders.
   const subtotal = items.reduce((s, i) => s + i.price_krw * i.quantity, 0);
   const subtotalCny = items.reduce((s, i) => s + i.price_cny * i.quantity, 0);
-  const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE);
-  const total = subtotal + serviceFee + SHIPPING_FEE;
+  const total = subtotal + SHIPPING_FEE;
 
   const handleOrder = async () => {
     if (items.length === 0) return;
@@ -67,7 +67,6 @@ export default function CartPage() {
           })),
           total_cny: subtotalCny,
           total_krw: subtotal,
-          service_fee: serviceFee,
           shipping_fee: SHIPPING_FEE,
         }),
       });
@@ -93,9 +92,9 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <ShoppingCart className="w-16 h-16 text-text-tertiary mx-auto mb-4" />
-        <h2 className="text-lg font-semibold text-text-primary mb-2">장바구니가 비어있습니다</h2>
-        <p className="text-sm text-text-tertiary mb-6">마음에 드는 상품을 담아보세요</p>
+        <ShoppingCart className="w-16 h-16 text-muted-soft mx-auto mb-4" />
+        <h2 className="text-lg font-semibold text-ink mb-2">장바구니가 비어있습니다</h2>
+        <p className="text-sm text-muted mb-6">마음에 드는 상품을 담아보세요</p>
         <Link href="/shop">
           <Button>쇼핑 계속하기</Button>
         </Link>
@@ -107,16 +106,16 @@ export default function CartPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/shop" className="text-text-tertiary hover:text-primary transition-colors">
+          <Link href="/shop" className="text-muted hover:text-ink transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-xl font-bold text-text-primary">
+          <h1 className="text-xl font-bold text-ink">
             장바구니 <span className="text-primary">{items.length}</span>
           </h1>
         </div>
         <button
           onClick={handleClear}
-          className="text-sm text-text-tertiary hover:text-danger transition-colors"
+          className="text-sm text-muted hover:text-error transition-colors"
         >
           전체 삭제
         </button>
@@ -128,8 +127,8 @@ export default function CartPage() {
           {items.map((item) => {
             const key = item.product_id + (item.sku_id || '');
             return (
-              <div key={key} className="bg-white border border-border rounded-[var(--radius-lg)] p-4 flex gap-4">
-                <div className="w-16 h-16 bg-surface rounded-[var(--radius-md)] flex-shrink-0 overflow-hidden">
+              <div key={key} className="bg-canvas border border-hairline rounded-[var(--radius-md)] p-4 flex gap-4">
+                <div className="w-16 h-16 bg-surface-soft rounded-[var(--radius-sm)] flex-shrink-0 overflow-hidden">
                   {item.image ? (
                     <Image
                       src={`/api/image-proxy?url=${encodeURIComponent(item.image)}`}
@@ -144,9 +143,9 @@ export default function CartPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary line-clamp-2 mb-1">{item.title}</p>
+                  <p className="text-sm font-medium text-ink line-clamp-2 mb-1">{item.title}</p>
                   {item.sku_name && (
-                    <p className="text-xs text-text-tertiary">{item.sku_name}</p>
+                    <p className="text-xs text-muted">{item.sku_name}</p>
                   )}
                   {item.min_order && item.min_order > 1 && (
                     <p className="text-xs text-warning mb-2">최소 주문 {item.min_order}개</p>
@@ -157,14 +156,14 @@ export default function CartPage() {
                       <button
                         onClick={() => handleQty(item, -1)}
                         disabled={item.quantity <= (item.min_order || 1)}
-                        className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-surface disabled:opacity-40 transition-colors"
+                        className="w-7 h-7 rounded-full border border-hairline flex items-center justify-center hover:bg-surface-soft disabled:opacity-40 transition-colors"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
                       <button
                         onClick={() => handleQty(item, 1)}
-                        className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-surface transition-colors"
+                        className="w-7 h-7 rounded-full border border-hairline flex items-center justify-center hover:bg-surface-soft transition-colors"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -173,16 +172,16 @@ export default function CartPage() {
                     {/* 가격 + 삭제 */}
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-bold text-text-primary">
+                        <p className="text-sm font-bold text-ink">
                           {formatPrice(item.price_krw * item.quantity)}
                         </p>
-                        <p className="text-xs text-text-tertiary">
+                        <p className="text-xs text-muted">
                           ¥{(item.price_cny * item.quantity).toFixed(2)}
                         </p>
                       </div>
                       <button
                         onClick={() => handleRemove(item)}
-                        className="text-text-tertiary hover:text-danger transition-colors"
+                        className="text-muted hover:text-error transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -196,25 +195,21 @@ export default function CartPage() {
 
         {/* 결제 요약 */}
         <div className="lg:col-span-1">
-          <div className="bg-white border border-border rounded-[var(--radius-lg)] p-5 sticky top-4">
+          <div className="bg-canvas border border-hairline rounded-[var(--radius-md)] p-5 sticky top-4">
             <h2 className="text-sm font-semibold mb-4">결제 요약</h2>
             <div className="space-y-2.5 text-sm mb-4">
               <div className="flex justify-between">
-                <span className="text-text-secondary">상품 금액</span>
+                <span className="text-muted">상품 금액</span>
                 <div className="text-right">
                   <p>{formatPrice(subtotal)}</p>
-                  <p className="text-xs text-text-tertiary">¥{subtotalCny.toFixed(2)}</p>
+                  <p className="text-xs text-muted">¥{subtotalCny.toFixed(2)}</p>
                 </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-secondary">서비스 수수료 (12%)</span>
-                <span>{formatPrice(serviceFee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">배송비</span>
+                <span className="text-muted">배송비</span>
                 <span>{formatPrice(SHIPPING_FEE)}</span>
               </div>
-              <div className="border-t border-border pt-2.5 flex justify-between font-bold text-base">
+              <div className="border-t border-hairline pt-2.5 flex justify-between font-bold text-base">
                 <span>총 결제 금액</span>
                 <span className="text-primary">{formatPrice(total)}</span>
               </div>
@@ -226,7 +221,7 @@ export default function CartPage() {
             >
               주문하기
             </Button>
-            <Link href="/shop" className="block text-center text-xs text-text-tertiary hover:text-primary mt-3 transition-colors">
+            <Link href="/shop" className="block text-center text-xs text-muted hover:text-ink mt-3 transition-colors">
               쇼핑 계속하기
             </Link>
           </div>

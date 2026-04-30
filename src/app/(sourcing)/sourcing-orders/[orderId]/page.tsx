@@ -214,17 +214,13 @@ export default function SourcingOrderDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Price Summary */}
+      {/* Price Summary — service fee is rolled into product unit price (margin-included) */}
       <div className="bg-white border border-border rounded-[var(--radius-lg)] p-6 mb-6">
         <h2 className="text-sm font-semibold mb-4">결제 정보</h2>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-text-secondary">상품 금액</span>
-            <span>{formatPrice(order.total_krw)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-text-secondary">서비스 수수료</span>
-            <span>{formatPrice(order.service_fee)}</span>
+            <span>{formatPrice(order.total_krw + order.service_fee)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">배송비</span>
