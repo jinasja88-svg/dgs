@@ -112,6 +112,9 @@ export interface SourcingProduct {
   title_zh?: string;
   price_cny: number;
   price_krw: number;
+  price_cny_max?: number;
+  origin_price_cny?: number;
+  import_unit_label?: string;
   images: string[];
   skus: SourcingSku[];
   seller: SourcingSeller | null;
@@ -119,6 +122,15 @@ export interface SourcingProduct {
   category?: string;
   min_order?: number;
   detail_url?: string;
+  sale_count?: number;
+  sales_90d?: number;
+  sales_monthly?: number;
+  repurchase_rate?: number;
+  rating?: number;
+  service_tags?: string[];
+  service_labels?: string[];
+  product_props?: Array<Record<string, string>>;
+  tier_prices?: Array<{ begin_num: number; price_cny: number; price_krw: number }>;
   // ─ Phase 1: 신뢰 시그널 / 배지 ─
   badges?: SourcingBadge[];
   is_new?: boolean;
@@ -166,6 +178,9 @@ export interface SourcingSeller {
   is_super_factory?: boolean;
   repurchase_rate?: number;
   sales_90d?: number;
+  delivery_24h_rate?: number;
+  delivery_48h_rate?: number;
+  is_plus?: boolean;
 }
 
 export interface SourcingOrder {

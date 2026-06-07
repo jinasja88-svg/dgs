@@ -1,6 +1,22 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Hakgyoansim Allimjang";
+  src: url("../../font/학교안심 알림장/Hakgyoansim Allimjang TTF R.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Hakgyoansim Allimjang";
+  src: url("../../font/학교안심 알림장/Hakgyoansim Allimjang TTF B.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Safe area insets for native app (iOS notch, Android navigation bar) */
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);
@@ -94,7 +110,7 @@
   --color-border-dark: var(--color-border-strong);
 
   /* === Fonts === */
-  --font-body: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", "Apple SD Gothic Neo", sans-serif;
+  --font-body: "Hakgyoansim Allimjang", "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", "Apple SD Gothic Neo", sans-serif;
 
   /* === Border Radius (DESIGN.md §8.2) === */
   --radius-xs: 4px;
@@ -181,10 +197,10 @@ body {
 }
 
 /* DESIGN.md §3 — display headings keep modest weight; only rating-display goes 700 */
-h1 { font-size: 28px; font-weight: 700; line-height: 1.43; letter-spacing: -0.3px; font-family: var(--font-body); }
-h2 { font-size: 22px; font-weight: 600; line-height: 1.2;  letter-spacing: -0.4px; font-family: var(--font-body); }
+h1 { font-size: 28px; font-weight: 700; line-height: 1.43; letter-spacing: 0; font-family: var(--font-body); }
+h2 { font-size: 22px; font-weight: 600; line-height: 1.2;  letter-spacing: 0; font-family: var(--font-body); }
 h3 { font-size: 21px; font-weight: 700; line-height: 1.43; font-family: var(--font-body); }
-h4 { font-size: 20px; font-weight: 600; line-height: 1.2;  letter-spacing: -0.18px; font-family: var(--font-body); }
+h4 { font-size: 20px; font-weight: 600; line-height: 1.2;  letter-spacing: 0; font-family: var(--font-body); }
 h5 { font-size: 16px; font-weight: 600; line-height: 1.25; font-family: var(--font-body); }
 h6 { font-size: 16px; font-weight: 500; line-height: 1.25; font-family: var(--font-body); }
 

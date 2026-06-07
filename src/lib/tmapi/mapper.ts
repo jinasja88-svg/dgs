@@ -8,6 +8,26 @@ function parsePriceRange(priceStr: string): number {
   return parseFloat(first) || 0;
 }
 
+function parsePriceMax(priceStr: string): number | undefined {
+  if (!priceStr) return undefined;
+  const parts = priceStr.split('-').map((p) => parseFloat(p)).filter((n) => Number.isFinite(n));
+  if (parts.length <= 1) return undefined;
+  return Math.max(...parts);
+}
+
+function parsePercent(value?: string): number | undefined {
+  if (!value) return undefined;
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return undefined;
+  return n <= 1 ? Math.round(n * 100) : Math.round(n);
+}
+
+function parseCount(value?: string | number | null): number | undefined {
+  if (value == null) return undefined;
+  const n = typeof value === 'number' ? value : parseInt(value, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function daysSince(iso?: string): number {
   if (!iso) return Number.POSITIVE_INFINITY;
   const t = Date.parse(iso);
@@ -18,6 +38,22 @@ function daysSince(iso?: string): number {
 function tagsHas(tags: string[] | undefined, ...needles: RegExp[]): boolean {
   if (!tags?.length) return false;
   return tags.some((t) => needles.some((re) => re.test(t)));
+}
+
+function buildServiceLabels(tags?: string[]): string[] {
+  if (!tags?.length) return [];
+  const labels: string[] = [];
+  const add = (label: string) => {
+    if (!labels.includes(label)) labels.push(label);
+  };
+
+  for (const tag of tags) {
+    if (/1688Select|select1688/i.test(tag)) add('1688 엄선');
+    else if (/7daysReturn|7day|return/i.test(tag)) add('7일 반품');
+    else if (/quality|assurance|cert/i.test(tag)) add('품질 보장');
+    else if (/drop|consign|proxy/i.test(tag)) add('위탁판매 지원');
+  }
+  return labels.slice(0, 6);
 }
 
 function buildSearchItemBadges(item: TmapiSearchItem): {
@@ -72,39 +108,51 @@ export function mapSearchItemToSourcingProduct(
   item: TmapiSearchItem,
   exchangeRate: number
 ): SourcingProduct {
-  const priceCny = parsePriceRange(item.price_info?.sale_price || item.price);
+  const priceRaw = item.price_info?.sale_price || item.price;
+  const priceCny = parsePriceRange(priceRaw);
+  const sales90d = parseCount(item.sale_info?.sale_quantity_90days);
+  const rating = item.shop_info?.score_info?.composite_score
+    ? parseFloat(item.shop_info.score_info.composite_score)
+    : undefined;
+  const repurchaseRate = parsePercent(item.item_repurchase_rate);
   const sig = buildSearchItemBadges(item);
-  const ships24Rate = parseFloat(item.delivery_info?.delivery_24h_rate || '0');
-  const ships48Rate = parseFloat(item.delivery_info?.delivery_48h_rate || '0');
+  const ships24Rate = parsePercent(item.delivery_info?.delivery_24h_rate);
+  const ships48Rate = parsePercent(item.delivery_info?.delivery_48h_rate);
 
   return {
     product_id: String(item.item_id),
     title: item.title,
     title_zh: item.title,
     price_cny: priceCny,
+    price_cny_max: parsePriceMax(priceRaw),
+    origin_price_cny: parsePriceRange(item.price_info?.origin_price),
     price_krw: toDdalkkakKrw(priceCny, exchangeRate),
+    import_unit_label: '* 수입시 예상 단가',
     images: item.img ? [item.img] : [],
     skus: [],
     seller: {
       name: item.shop_info?.company_name || '',
       years: item.shop_info?.shop_years,
-      rating: item.shop_info?.score_info?.composite_score
-        ? parseFloat(item.shop_info.score_info.composite_score)
-        : undefined,
+      rating,
       is_super_factory: item.shop_info?.is_super_factory || false,
-      repurchase_rate: item.item_repurchase_rate
-        ? parseFloat(item.item_repurchase_rate)
-        : undefined,
-      sales_90d: item.sale_info?.sale_quantity_90days
-        ? parseInt(item.sale_info.sale_quantity_90days)
-        : undefined,
+      repurchase_rate: repurchaseRate,
+      sales_90d: sales90d,
+      delivery_24h_rate: ships24Rate,
+      delivery_48h_rate: ships48Rate,
+      is_plus: !!item.shop_info?.is_plus,
     },
     stock: 0,
     min_order: parseInt(item.moq) || 1,
+    sales_90d: sales90d,
+    sales_monthly: sales90d ? Math.round(sales90d / 3) : undefined,
+    repurchase_rate: repurchaseRate,
+    rating,
+    service_tags: item.service_tags || [],
+    service_labels: buildServiceLabels(item.service_tags),
     badges: sig.badges,
     is_new: sig.is_new,
-    ships_in_24h: item.delivery_info?.is_24h_delivery === true || ships24Rate >= 0.5,
-    ships_in_48h: ships48Rate >= 0.5,
+    ships_in_24h: item.delivery_info?.is_24h_delivery === true || (ships24Rate ?? 0) >= 50,
+    ships_in_48h: (ships48Rate ?? 0) >= 50,
     is_1688_select: sig.is_1688_select,
     is_super_factory: !!item.shop_info?.is_super_factory,
     free_shipping: sig.free_shipping,
@@ -118,6 +166,8 @@ export function mapItemDetailToSourcingProduct(
   exchangeRate: number
 ): SourcingProduct {
   const priceCny = parsePriceRange(detail.price_info?.price_min || detail.price_info?.price || '0');
+  const priceMax = parsePriceRange(detail.price_info?.price_max || detail.price_info?.price || '');
+  const saleCount = parseCount(detail.sale_count);
 
   const skus: SourcingSku[] = (detail.skus || []).map((sku) => {
     const skuPrice = parseFloat(sku.sale_price) || priceCny;
@@ -166,13 +216,25 @@ export function mapItemDetailToSourcingProduct(
     // title_zh: language=ko 호출 시 title이 이미 한국어이므로 중국어 원본 없음
     // 검색 목록에서 이미 title_zh가 설정되어 클라이언트에 전달됨
     price_cny: priceCny,
+    price_cny_max: priceMax && priceMax !== priceCny ? priceMax : undefined,
+    origin_price_cny: parsePriceRange(detail.price_info?.origin_price_min),
     price_krw: toDdalkkakKrw(priceCny, exchangeRate),
+    import_unit_label: '* 수입시 예상 단가',
     images: detail.main_imgs || [],
     skus,
     seller,
     stock: totalStock,
     min_order: detail.tiered_price_info?.begin_num || 1,
     detail_url: detail.detail_url,
+    sale_count: saleCount,
+    service_tags: tags || [],
+    service_labels: buildServiceLabels(tags),
+    product_props: detail.product_props || [],
+    tier_prices: detail.tiered_price_info?.prices?.map((p) => ({
+      begin_num: p.begin_num,
+      price_cny: parseFloat(p.price) || priceCny,
+      price_krw: toDdalkkakKrw(parseFloat(p.price) || priceCny, exchangeRate),
+    })),
     is_1688_select: is1688Select,
     return_in_7d: isReturn7d,
   };
@@ -183,18 +245,24 @@ export function mapImageSearchItemToSourcingProduct(
   exchangeRate: number
 ): SourcingProduct {
   const priceCny = parsePriceRange(item.price_info?.sale_price || item.price);
+  const sales90d = parseCount(item.sale_info?.sale_quantity_90days);
   return {
     product_id: String(item.item_id),
     title: item.title,
     title_zh: item.title,
     price_cny: priceCny,
+    origin_price_cny: parsePriceRange(item.price_info?.origin_price),
     price_krw: toDdalkkakKrw(priceCny, exchangeRate),
+    import_unit_label: '* 수입시 예상 단가',
     images: item.img ? [item.img] : [],
     skus: [],
     seller: {
       name: item.shop_info?.company_name || '',
+      sales_90d: sales90d,
     },
     stock: 0,
     min_order: 1,
+    sales_90d: sales90d,
+    sales_monthly: sales90d ? Math.round(sales90d / 3) : undefined,
   };
 }

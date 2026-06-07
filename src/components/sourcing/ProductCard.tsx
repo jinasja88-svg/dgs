@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Heart, Search, Star } from 'lucide-react';
+import { Factory, Heart, Search, Star, Truck } from 'lucide-react';
 import { cn, formatPrice } from '@/lib/utils';
 import CardBadge from './CardBadge';
 import type { SourcingProduct } from '@/types';
@@ -32,13 +32,20 @@ function buildHref(product: SourcingProduct): string {
   if (product.min_order && product.min_order > 1) {
     params.set('min_order', String(product.min_order));
   }
+  if (product.sales_monthly) params.set('sales_monthly', String(product.sales_monthly));
+  if (product.repurchase_rate) params.set('repurchase_rate', String(product.repurchase_rate));
+  if (product.rating) params.set('rating', String(product.rating));
   return `/shop/${product.product_id}?${params.toString()}`;
 }
 
-function formatSalesPerMonth(sales90d?: number): string | null {
-  if (!sales90d || sales90d <= 0) return null;
-  const monthly = Math.round(sales90d / 3);
-  return monthly.toLocaleString('ko-KR');
+function formatNumber(value?: number): string | null {
+  if (!value || value <= 0) return null;
+  return value.toLocaleString('ko-KR');
+}
+
+function formatCny(value?: number): string | null {
+  if (!value || value <= 0) return null;
+  return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2);
 }
 
 export default function ProductCard({
@@ -48,10 +55,19 @@ export default function ProductCard({
   onSimilarSearch,
 }: ProductCardProps) {
   const href = buildHref(product);
-  const monthlySales = formatSalesPerMonth(product.seller?.sales_90d);
-  const repurchasePct = product.seller?.repurchase_rate;
-  const showRepurchase = typeof repurchasePct === 'number' && repurchasePct >= 30;
-  const rating = product.seller?.rating;
+  const monthlySales = formatNumber(product.sales_monthly || (product.seller?.sales_90d ? Math.round(product.seller.sales_90d / 3) : undefined));
+  const repurchasePct = product.repurchase_rate ?? product.seller?.repurchase_rate;
+  const rating = product.rating ?? product.seller?.rating;
+  const primaryCny = formatCny(product.price_cny);
+  const maxCny = formatCny(product.price_cny_max);
+  const originCny = formatCny(product.origin_price_cny);
+  const signals = [
+    product.ships_in_24h ? '24h 발송' : null,
+    product.ships_in_48h && !product.ships_in_24h ? '48h 발송' : null,
+    product.free_shipping ? '무료배송' : null,
+    product.return_in_7d ? '7일 반품' : null,
+    product.is_super_factory ? '인증 공장' : null,
+  ].filter((signal): signal is string => Boolean(signal));
 
   return (
     <article className="group block">
@@ -136,42 +152,74 @@ export default function ProductCard({
           </h3>
         </Link>
 
+        {product.title_zh && product.title_zh !== product.title && (
+          <p className="text-xs text-muted line-clamp-1">{product.title_zh}</p>
+        )}
+
         {(product.seller?.name || (product.min_order && product.min_order > 1)) && (
-          <p className="text-sm text-muted truncate">
+          <p className="text-xs text-muted truncate">
             {product.seller?.name}
             {product.min_order && product.min_order > 1 && ` · MOQ ${product.min_order}`}
           </p>
         )}
 
-        {/* Star color is INK per DESIGN.md §2 — no yellow rating stars */}
-        {(rating != null || monthlySales) && (
-          <p className="text-sm flex items-center gap-1 text-ink">
-            {rating != null && (
-              <>
-                <Star className="w-3.5 h-3.5 fill-ink stroke-ink" strokeWidth={1.5} />
-                <span className="font-medium">{rating.toFixed(2)}</span>
-              </>
-            )}
+        {(monthlySales || repurchasePct != null) && (
+          <div className="grid grid-cols-2 gap-1.5">
             {monthlySales && (
-              <span className="text-muted">
-                {rating != null && '· '}월 {monthlySales}개 판매
+              <div className="rounded-[var(--radius-sm)] bg-surface-soft px-2 py-1">
+                <p className="text-[10px] text-muted leading-none">월 판매량</p>
+                <p className="mt-1 text-xs font-semibold text-ink">{monthlySales}개</p>
+              </div>
+            )}
+            {repurchasePct != null && (
+              <div className="rounded-[var(--radius-sm)] bg-surface-soft px-2 py-1">
+                <p className="text-[10px] text-muted leading-none">재구매율</p>
+                <p className="mt-1 text-xs font-semibold text-ink">{Math.round(repurchasePct)}%</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Price — single Ddalkkak unit price (margin baked in by mapper) */}
+        <div className="pt-0.5">
+          <p className="text-[11px] text-muted">{product.import_unit_label || '* 수입시 예상 단가'}</p>
+          <p className="text-base text-ink flex items-baseline gap-1.5">
+            <span className="font-semibold">{formatPrice(product.price_krw)}</span>
+            <span className="text-muted text-xs">/</span>
+            <span className="text-sm text-muted">
+              ¥{primaryCny}{maxCny ? `~${maxCny}` : ''}
+            </span>
+            {originCny && originCny !== primaryCny && (
+              <span className="text-xs text-muted-soft line-through">¥{originCny}</span>
+            )}
+          </p>
+        </div>
+
+        {(rating != null || product.seller?.is_super_factory || product.seller?.years) && (
+          <p className="text-xs flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted pt-0.5">
+            {rating != null && (
+              <span className="inline-flex items-center gap-0.5 text-ink">
+                <Star className="w-3 h-3 fill-ink stroke-ink" strokeWidth={1.5} />
+                {rating.toFixed(1)}
+              </span>
+            )}
+            {product.seller?.years ? <span>{product.seller.years}년 거래</span> : null}
+            {product.seller?.is_super_factory && (
+              <span className="inline-flex items-center gap-0.5">
+                <Factory className="w-3 h-3" />
+                공장
               </span>
             )}
           </p>
         )}
 
-        {/* Price — single Ddalkkak unit price (margin baked in by mapper) */}
-        <p className="text-base text-ink flex items-baseline gap-1.5">
-          <span className="font-semibold">¥{product.price_cny}</span>
-          <span className="text-muted text-sm">≈</span>
-          <span className="font-semibold">{formatPrice(product.price_krw)}</span>
-        </p>
-
         {/* Trust signals — sellochomes-style strip */}
-        {(product.ships_in_24h || showRepurchase) && (
-          <p className="text-xs text-muted flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
-            {product.ships_in_24h && <span>24h 발송</span>}
-            {showRepurchase && <span>재구매 {Math.round(repurchasePct!)}%</span>}
+        {signals.length > 0 && (
+          <p className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+            <Truck className="w-3 h-3 text-muted-soft" />
+            {signals.slice(0, 3).map((signal) => (
+              <span key={signal}>{signal}</span>
+            ))}
           </p>
         )}
       </div>

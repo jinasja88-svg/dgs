@@ -3,7 +3,7 @@
 import { useState, use, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink, Star, MessageSquare } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, ArrowLeft, Heart, ExternalLink, Star, MessageSquare, Factory, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -22,6 +22,16 @@ function proxyImg(url: string): string {
     return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
+}
+
+function formatNumber(value?: number): string | null {
+  if (!value || value <= 0) return null;
+  return value.toLocaleString('ko-KR');
+}
+
+function formatCny(value?: number): string | null {
+  if (!value || value <= 0) return null;
+  return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2);
 }
 
 export default function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
@@ -48,6 +58,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     const price_cny = searchParams.get('price_cny');
     const seller = searchParams.get('seller');
     const min_order = searchParams.get('min_order');
+    const sales_monthly = searchParams.get('sales_monthly');
+    const repurchase_rate = searchParams.get('repurchase_rate');
+    const rating = searchParams.get('rating');
     if (!title) return null;
     return {
       product_id: productId,
@@ -60,6 +73,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       seller: seller ? { name: decodeURIComponent(seller) } : null,
       stock: 0,
       min_order: min_order ? Math.max(1, parseInt(min_order)) : undefined,
+      sales_monthly: sales_monthly ? Number(sales_monthly) : undefined,
+      repurchase_rate: repurchase_rate ? Number(repurchase_rate) : undefined,
+      rating: rating ? Number(rating) : undefined,
     };
   })();
 
@@ -81,8 +97,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
   // price_krw is the displayed Ddalkkak unit price (margin baked in by mapper).
   const currentPrice = selectedSkuData?.price_krw || displayProduct?.price_krw || 0;
   const currentPriceCny = selectedSkuData?.price_cny || displayProduct?.price_cny || 0;
+  const currentPriceCnyMax = displayProduct?.price_cny_max;
   const shippingFee = 3000;
   const totalPrice = currentPrice * quantity + shippingFee;
+  const monthlySales = formatNumber(displayProduct?.sales_monthly);
+  const saleCount = formatNumber(displayProduct?.sale_count);
+  const salesLabel = monthlySales ? '월 판매량' : '판매 수량';
+  const salesValue = monthlySales ? `${monthlySales}개` : saleCount ? `${saleCount}개` : '-';
+  const repurchasePct = displayProduct?.repurchase_rate ?? displayProduct?.seller?.repurchase_rate;
+  const rating = displayProduct?.rating ?? displayProduct?.seller?.rating;
+  const extraServiceLabels = displayProduct?.service_labels?.filter((label) => {
+    if (label === '7일 반품' && displayProduct.return_in_7d) return false;
+    if (label === '1688 엄선' && displayProduct.is_1688_select) return false;
+    return true;
+  });
 
   useEffect(() => {
     const supabase = createClient();
@@ -324,15 +352,59 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
 
             <div className="flex items-baseline gap-3 mb-6">
               <span className="text-3xl font-bold text-primary">{formatPrice(currentPrice)}</span>
-              <span className="text-sm text-text-tertiary">¥{currentPriceCny}</span>
+              <span className="text-sm text-text-tertiary">
+                ¥{formatCny(currentPriceCny)}{currentPriceCnyMax ? `~${formatCny(currentPriceCnyMax)}` : ''}
+              </span>
+              <span className="text-xs text-text-tertiary">{displayProduct!.import_unit_label || '* 수입시 예상 단가'}</span>
             </div>
 
             {displayProduct!.seller && (
-              <div className="flex items-center gap-4 p-3 bg-surface rounded-[var(--radius-md)] mb-6 text-sm">
-                <span className="font-medium">{displayProduct!.seller.name}</span>
-                {displayProduct!.seller.rating && <span className="text-warning">★ {displayProduct!.seller.rating}</span>}
-                {displayProduct!.seller.years && <span className="text-text-tertiary">{displayProduct!.seller.years}년</span>}
-                {displayProduct!.seller.location && <span className="text-text-tertiary">{displayProduct!.seller.location}</span>}
+              <div className="p-4 bg-surface rounded-[var(--radius-md)] mb-4 text-sm">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-semibold text-ink">{displayProduct!.seller.name}</span>
+                  {rating && (
+                    <span className="inline-flex items-center gap-1 text-ink">
+                      <Star className="w-3.5 h-3.5 fill-ink stroke-ink" />
+                      {rating.toFixed(1)}
+                    </span>
+                  )}
+                  {displayProduct!.seller.years && <span className="text-text-tertiary">{displayProduct!.seller.years}년 거래</span>}
+                  {displayProduct!.seller.location && <span className="text-text-tertiary">{displayProduct!.seller.location}</span>}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                  <InfoStat label={salesLabel} value={salesValue} />
+                  <InfoStat label="재구매율" value={repurchasePct != null ? `${Math.round(repurchasePct)}%` : '-'} />
+                  <InfoStat label="재고" value={displayProduct!.stock ? `${formatNumber(displayProduct!.stock)}개` : '-'} />
+                  <InfoStat label="최소 주문" value={`${displayProduct!.min_order || 1}개`} />
+                </div>
+              </div>
+            )}
+
+            {(extraServiceLabels?.length || displayProduct!.is_super_factory || displayProduct!.free_shipping || displayProduct!.ships_in_24h || displayProduct!.return_in_7d || displayProduct!.is_1688_select) && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {displayProduct!.is_1688_select && <SignalBadge icon={<ShieldCheck className="w-3.5 h-3.5" />} label="1688 엄선" />}
+                {displayProduct!.is_super_factory && <SignalBadge icon={<Factory className="w-3.5 h-3.5" />} label="인증 공장" />}
+                {displayProduct!.ships_in_24h && <SignalBadge icon={<Truck className="w-3.5 h-3.5" />} label="24시간 내 발송" />}
+                {displayProduct!.free_shipping && <SignalBadge icon={<PackageCheck className="w-3.5 h-3.5" />} label="무료배송" />}
+                {displayProduct!.return_in_7d && <SignalBadge icon={<ShieldCheck className="w-3.5 h-3.5" />} label="7일 반품" />}
+                {extraServiceLabels?.map((label) => (
+                  <SignalBadge key={label} label={label} />
+                ))}
+              </div>
+            )}
+
+            {displayProduct!.tier_prices && displayProduct!.tier_prices.length > 0 && (
+              <div className="mb-6">
+                <label className="text-sm font-medium text-text-primary mb-2 block">구간 단가</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {displayProduct!.tier_prices.slice(0, 6).map((tier) => (
+                    <div key={`${tier.begin_num}-${tier.price_cny}`} className="rounded-[var(--radius-sm)] border border-border-light p-2">
+                      <p className="text-xs text-text-tertiary">{tier.begin_num}개 이상</p>
+                      <p className="text-sm font-semibold text-ink">{formatPrice(tier.price_krw)}</p>
+                      <p className="text-xs text-text-tertiary">¥{formatCny(tier.price_cny)}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -436,8 +508,51 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
       {/* 1688 구매자 리뷰 */}
       <RatingsSection productId={productId} />
 
+      {displayProduct!.product_props && displayProduct!.product_props.length > 0 && (
+        <ProductPropsSection props={displayProduct!.product_props} />
+      )}
+
       {/* 1688 상세 페이지 */}
       <DetailSection productId={productId} />
+    </div>
+  );
+}
+
+function InfoStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] bg-canvas px-3 py-2 border border-border-light">
+      <p className="text-[11px] text-text-tertiary">{label}</p>
+      <p className="text-sm font-semibold text-ink mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function SignalBadge({ label, icon }: { label: string; icon?: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border-light bg-canvas px-3 py-1 text-xs font-medium text-ink">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function ProductPropsSection({ props }: { props: Array<Record<string, string>> }) {
+  const entries = props.flatMap((prop) => Object.entries(prop)).filter(([key, value]) => key && value);
+  if (!entries.length) return null;
+
+  return (
+    <div className="mt-8">
+      <h2 className="text-base font-semibold text-text-primary mb-3">상품 속성</h2>
+      <div className="border border-border-light rounded-[var(--radius-lg)] overflow-hidden bg-white">
+        <dl className="grid sm:grid-cols-2">
+          {entries.slice(0, 20).map(([key, value], idx) => (
+            <div key={`${key}-${idx}`} className="grid grid-cols-[112px_1fr] border-b border-border-light last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0">
+              <dt className="bg-surface-soft px-3 py-2 text-xs font-medium text-text-tertiary">{key}</dt>
+              <dd className="px-3 py-2 text-sm text-text-primary">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </div>
   );
 }
