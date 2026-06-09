@@ -4,6 +4,7 @@ import Providers from './providers';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import SupportChatWidget from '@/components/SupportChatWidget';
+import MobileBottomNav from '@/components/layout/MobileBottomNav';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -38,6 +39,7 @@ export default function RootLayout({
           <Header />
           <div className="min-h-[calc(100vh-64px)]">{children}</div>
           <Footer />
+          <MobileBottomNav />
           <SupportChatWidget />
         </Providers>
       </body>

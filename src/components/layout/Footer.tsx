@@ -15,7 +15,7 @@ const infoLinks = [
 export default function Footer() {
   return (
     <footer className="bg-surface border-t border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-[88px] md:pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-10">
 
         {/* 상단: 브랜드 + 링크 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">

@@ -165,14 +165,14 @@ export default function SupportChatWidget() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="고객센터 채팅"
-        className="fixed right-4 bottom-20 md:bottom-6 z-50 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center hover:bg-primary-60 transition-colors"
+        className="fixed right-4 bottom-[calc(var(--mobile-bottom-nav-height)+var(--safe-area-bottom)+1rem)] md:bottom-6 z-50 w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center hover:bg-primary-60 transition-colors"
       >
         {open ? <X className="w-6 h-6" /> : <Headphones className="w-6 h-6" />}
       </button>
 
       {/* 채팅 패널 */}
       {open && (
-        <div className="fixed right-4 bottom-36 md:bottom-24 z-50 w-[calc(100vw-2rem)] max-w-[360px] h-[480px] max-h-[70vh] bg-white border border-hairline rounded-[var(--radius-lg)] shadow-xl flex flex-col overflow-hidden">
+        <div className="fixed right-4 bottom-[calc(var(--mobile-bottom-nav-height)+var(--safe-area-bottom)+5.5rem)] md:bottom-24 z-50 w-[calc(100vw-2rem)] max-w-[360px] h-[480px] max-h-[70vh] bg-white border border-hairline rounded-[var(--radius-lg)] shadow-xl flex flex-col overflow-hidden">
           {/* 헤더 */}
           <div className="flex items-center justify-between px-4 py-3 bg-primary text-white flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export default function SupportChatWidget() {
                           'max-w-[78%] px-3 py-2 rounded-[var(--radius-md)] text-sm whitespace-pre-wrap break-words ' +
                           (m.sender === 'user'
                             ? 'bg-primary text-white rounded-br-sm'
-                            : 'bg-white border border-hairline text-ink rounded-bl-sm')
+                            : 'bg-surface-strong text-ink rounded-bl-sm')
                         }
                       >
                         {m.body}

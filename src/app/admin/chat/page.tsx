@@ -32,8 +32,6 @@ export default function AdminChatPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const selectedRef = useRef<string | null>(null);
-  selectedRef.current = selectedId;
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -113,6 +111,7 @@ export default function AdminChatPage() {
 
   const label = (c: Conversation) =>
     c.profile.name || c.profile.email || `사용자 ${c.user_id.slice(0, 8)}`;
+  const selectedConversation = conversations.find((c) => c.id === selectedId) ?? null;
 
   return (
     <div>
@@ -142,6 +141,7 @@ export default function AdminChatPage() {
                     </span>
                   )}
                 </div>
+                <p className="text-[11px] text-text-tertiary truncate">ID: {c.user_id}</p>
                 {c.profile.email && c.profile.name && (
                   <p className="text-[11px] text-text-tertiary truncate">{c.profile.email}</p>
                 )}
@@ -160,6 +160,25 @@ export default function AdminChatPage() {
             </div>
           ) : (
             <>
+              <div className="border-b border-border px-4 py-3 bg-white flex-shrink-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-text-primary truncate">
+                      {selectedConversation ? label(selectedConversation) : '고객 대화'}
+                    </p>
+                    {selectedConversation && (
+                      <p className="text-[11px] text-text-tertiary truncate">
+                        ID: {selectedConversation.user_id}
+                      </p>
+                    )}
+                  </div>
+                  {selectedConversation?.unread_admin ? (
+                    <span className="flex-shrink-0 min-w-5 h-5 px-1.5 bg-primary text-white text-[11px] font-bold rounded-full flex items-center justify-center">
+                      {selectedConversation.unread_admin}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-surface">
                 {messages.length === 0 ? (
                   <p className="text-center text-xs text-text-tertiary py-6">메시지를 불러오는 중...</p>
@@ -171,7 +190,7 @@ export default function AdminChatPage() {
                           'max-w-[70%] px-3 py-2 rounded-[var(--radius-md)] text-sm whitespace-pre-wrap break-words',
                           m.sender === 'admin'
                             ? 'bg-primary text-white rounded-br-sm'
-                            : 'bg-white border border-hairline text-ink rounded-bl-sm'
+                            : 'bg-surface-strong text-ink rounded-bl-sm'
                         )}
                       >
                         {m.body}
