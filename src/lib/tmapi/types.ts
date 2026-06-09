@@ -95,6 +95,8 @@ export interface TmapiItemDetail {
   delivery_info?: {
     location: string;
     delivery_fee: number;
+    /** 단위 무게(kg) — 1688 셀러 입력값. 예: 0.1 = 100g */
+    unit_weight?: number;
   };
   service_tags?: string[];
   sku_props: TmapiSkuProp[];

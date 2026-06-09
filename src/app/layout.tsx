@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Providers from './providers';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
+import ChannelTalkBoot from '@/components/ChannelTalkBoot';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -35,6 +37,8 @@ export default function RootLayout({
         <Providers>
           <Header />
           <div className="min-h-[calc(100vh-64px)]">{children}</div>
+          <Footer />
+          <ChannelTalkBoot />
         </Providers>
       </body>
     </html>

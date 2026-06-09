@@ -5,18 +5,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
-import toast from 'react-hot-toast';
 import { getCart, updateCartQty, removeFromCart, clearCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/utils';
+import { DOMESTIC_SHIPPING_FEE } from '@/lib/shipping';
 import Button from '@/components/ui/Button';
 import type { SourcingCartItem } from '@/types';
 
-const SHIPPING_FEE = 3000;
+const SHIPPING_FEE = DOMESTIC_SHIPPING_FEE;
 
 export default function CartPage() {
   const router = useRouter();
   const [items, setItems] = useState<SourcingCartItem[]>([]);
-  const [isOrdering, setIsOrdering] = useState(false);
 
   const reload = useCallback(() => setItems(getCart()), []);
 
@@ -48,45 +47,10 @@ export default function CartPage() {
   const subtotalCny = items.reduce((s, i) => s + i.price_cny * i.quantity, 0);
   const total = subtotal + SHIPPING_FEE;
 
-  const handleOrder = async () => {
+  // 주문 생성은 결제 단계(/checkout)에서 사업자정보·약관 검증 후 처리
+  const handleCheckout = () => {
     if (items.length === 0) return;
-    setIsOrdering(true);
-    try {
-      const res = await fetch('/api/sourcing/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map((i) => ({
-            product_id: i.product_id,
-            title: i.title,
-            image: i.image,
-            sku_name: i.sku_name,
-            quantity: i.quantity,
-            price_cny: i.price_cny,
-            price_krw: i.price_krw,
-          })),
-          total_cny: subtotalCny,
-          total_krw: subtotal,
-          shipping_fee: SHIPPING_FEE,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: '주문 생성에 실패했습니다.' }));
-        toast.error(err.error || '주문 생성에 실패했습니다.');
-        return;
-      }
-
-      const order = await res.json();
-      clearCart();
-      reload();
-      // 결제 페이지로 이동 (Toss 연동 시 결제 진행, 미연동 시 안내 표시)
-      router.push(`/checkout?orderId=${order.order_number}`);
-    } catch {
-      toast.error('네트워크 오류가 발생했습니다.');
-    } finally {
-      setIsOrdering(false);
-    }
+    router.push('/checkout');
   };
 
   if (items.length === 0) {
@@ -206,18 +170,20 @@ export default function CartPage() {
                 </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">배송비</span>
+                <span className="text-muted">배송비 (예상)</span>
                 <span>{formatPrice(SHIPPING_FEE)}</span>
               </div>
               <div className="border-t border-hairline pt-2.5 flex justify-between font-bold text-base">
                 <span>총 결제 금액</span>
                 <span className="text-primary">{formatPrice(total)}</span>
               </div>
+              <p className="text-[11px] text-muted leading-relaxed">
+                국내 기본 배송비 기준이며, 제주·도서산간은 결제 단계에서 +3,000원이 적용됩니다.
+              </p>
             </div>
             <Button
               className="w-full"
-              onClick={handleOrder}
-              isLoading={isOrdering}
+              onClick={handleCheckout}
             >
               주문하기
             </Button>

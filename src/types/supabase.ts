@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string
+          value: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          value: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       api_call_logs: {
         Row: {
           created_at: string
@@ -101,6 +122,249 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupang_products: {
+        Row: {
+          buy_count: number | null
+          category: string
+          category_l1: string
+          category_l2: string | null
+          conversion_rate: number | null
+          conversion_source: string | null
+          coupang_url: string
+          crawled_at: string
+          created_at: string
+          estimated_monthly_revenue: number | null
+          estimated_monthly_sales: number | null
+          id: string
+          image_url: string | null
+          is_excluded_brand: boolean
+          item_name: string | null
+          main_keyword: string | null
+          price: number
+          product_name: string
+          rating: number | null
+          review_count: number
+          sub_keyword1: string | null
+          sub_keyword2: string | null
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          buy_count?: number | null
+          category: string
+          category_l1: string
+          category_l2?: string | null
+          conversion_rate?: number | null
+          conversion_source?: string | null
+          coupang_url: string
+          crawled_at?: string
+          created_at?: string
+          estimated_monthly_revenue?: number | null
+          estimated_monthly_sales?: number | null
+          id?: string
+          image_url?: string | null
+          is_excluded_brand?: boolean
+          item_name?: string | null
+          main_keyword?: string | null
+          price: number
+          product_name: string
+          rating?: number | null
+          review_count?: number
+          sub_keyword1?: string | null
+          sub_keyword2?: string | null
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          buy_count?: number | null
+          category?: string
+          category_l1?: string
+          category_l2?: string | null
+          conversion_rate?: number | null
+          conversion_source?: string | null
+          coupang_url?: string
+          crawled_at?: string
+          created_at?: string
+          estimated_monthly_revenue?: number | null
+          estimated_monthly_sales?: number | null
+          id?: string
+          image_url?: string | null
+          is_excluded_brand?: boolean
+          item_name?: string | null
+          main_keyword?: string | null
+          price?: number
+          product_name?: string
+          rating?: number | null
+          review_count?: number
+          sub_keyword1?: string | null
+          sub_keyword2?: string | null
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: []
+      }
+      coupang_user_costs: {
+        Row: {
+          coupang_product_id: string
+          id: string
+          import_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          coupang_product_id: string
+          id?: string
+          import_cost: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          coupang_product_id?: string
+          id?: string
+          import_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupang_user_costs_coupang_product_id_fkey"
+            columns: ["coupang_product_id"]
+            isOneToOne: false
+            referencedRelation: "coupang_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_faqs: {
+        Row: {
+          answer: string
+          category: string
+          created_at: string | null
+          id: string
+          is_published: boolean
+          question: string
+          sort_order: number | null
+        }
+        Insert: {
+          answer: string
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_published?: boolean
+          question: string
+          sort_order?: number | null
+        }
+        Update: {
+          answer?: string
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_published?: boolean
+          question?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      cs_inquiries: {
+        Row: {
+          admin_replied_at: string | null
+          admin_reply: string | null
+          category: string
+          content: string
+          created_at: string | null
+          id: string
+          order_id: string | null
+          status: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_replied_at?: string | null
+          admin_reply?: string | null
+          category: string
+          content: string
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_replied_at?: string | null
+          admin_reply?: string | null
+          category?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_inquiries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sourcing_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_returns: {
+        Row: {
+          admin_note: string | null
+          created_at: string | null
+          detail: string
+          id: string
+          order_id: string
+          reason: string
+          refund_amount: number | null
+          return_type: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string | null
+          detail: string
+          id?: string
+          order_id: string
+          reason: string
+          refund_amount?: number | null
+          return_type: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string | null
+          detail?: string
+          id?: string
+          order_id?: string
+          reason?: string
+          refund_amount?: number | null
+          return_type?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "sourcing_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -391,6 +655,7 @@ export type Database = {
       sourcing_orders: {
         Row: {
           admin_note: string | null
+          business_info: Json | null
           created_at: string
           id: string
           items: Json
@@ -401,6 +666,7 @@ export type Database = {
           shipping_address: Json | null
           shipping_fee: number
           status: string
+          terms_agreed: Json | null
           total_cny: number
           total_krw: number
           tracking_number: string | null
@@ -409,6 +675,7 @@ export type Database = {
         }
         Insert: {
           admin_note?: string | null
+          business_info?: Json | null
           created_at?: string
           id?: string
           items?: Json
@@ -419,6 +686,7 @@ export type Database = {
           shipping_address?: Json | null
           shipping_fee?: number
           status?: string
+          terms_agreed?: Json | null
           total_cny?: number
           total_krw?: number
           tracking_number?: string | null
@@ -427,6 +695,7 @@ export type Database = {
         }
         Update: {
           admin_note?: string | null
+          business_info?: Json | null
           created_at?: string
           id?: string
           items?: Json
@@ -437,6 +706,7 @@ export type Database = {
           shipping_address?: Json | null
           shipping_fee?: number
           status?: string
+          terms_agreed?: Json | null
           total_cny?: number
           total_krw?: number
           tracking_number?: string | null
@@ -553,6 +823,54 @@ export type Database = {
           payment_key?: string | null
           plan?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      translation_api_usage_daily: {
+        Row: {
+          api_calls: number
+          direction: string
+          model: string
+          text_items: number
+          updated_at: string
+          usage_date: string
+        }
+        Insert: {
+          api_calls?: number
+          direction: string
+          model: string
+          text_items?: number
+          updated_at?: string
+          usage_date: string
+        }
+        Update: {
+          api_calls?: number
+          direction?: string
+          model?: string
+          text_items?: number
+          updated_at?: string
+          usage_date?: string
+        }
+        Relationships: []
+      }
+      translation_cache: {
+        Row: {
+          created_at: string | null
+          direction: string
+          original: string
+          translated: string
+        }
+        Insert: {
+          created_at?: string | null
+          direction: string
+          original: string
+          translated: string
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string
+          original?: string
+          translated?: string
         }
         Relationships: []
       }

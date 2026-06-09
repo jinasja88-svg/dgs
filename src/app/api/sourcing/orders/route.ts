@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { generateOrderNumber } from '@/lib/utils';
+import { getDomesticShippingFee } from '@/lib/shipping';
+import type { BusinessInfo } from '@/types';
 
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -38,13 +40,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { items, total_cny, total_krw, service_fee, shipping_fee, shipping_address } = body as {
+  const { items, total_cny, total_krw, service_fee, shipping_address, business_info, terms_agreed } = body as {
     items: Array<{ product_id: string; title: string; image: string; sku_name?: string; quantity: number; price_cny: number; price_krw: number }>;
     total_cny: number;
     total_krw: number;
     service_fee: number;
-    shipping_fee: number;
-    shipping_address: Record<string, string> | null;
+    shipping_address: { name?: string; phone?: string; address?: string; detail_address?: string; postal_code?: string } | null;
+    business_info: Partial<BusinessInfo> | null;
+    terms_agreed: { terms?: boolean; privacy?: boolean; coupang?: boolean } | null;
   };
 
   // 입력값 검증
@@ -64,6 +67,42 @@ export async function POST(request: NextRequest) {
   if (typeof total_krw !== 'number' || total_krw <= 0) {
     return NextResponse.json({ error: '총 금액이 올바르지 않습니다.' }, { status: 400 });
   }
+
+  // 배송지 검증 (필수)
+  if (!shipping_address || !shipping_address.name || !shipping_address.phone || !shipping_address.address) {
+    return NextResponse.json({ error: '배송지 정보를 입력해주세요.' }, { status: 400 });
+  }
+
+  // 사업자정보 검증 (B2B 필수)
+  const regDigits = (business_info?.registration_number || '').replace(/\D/g, '');
+  if (
+    !business_info ||
+    !business_info.company_name ||
+    !business_info.representative ||
+    !business_info.business_type ||
+    !business_info.business_item ||
+    !business_info.address ||
+    regDigits.length !== 10
+  ) {
+    return NextResponse.json({ error: '사업자 정보를 모두 정확히 입력해주세요. (사업자등록번호 10자리)' }, { status: 400 });
+  }
+
+  // 약관 동의 검증 (이용약관/개인정보/쿠팡 로켓그로스)
+  if (!terms_agreed || !terms_agreed.terms || !terms_agreed.privacy || !terms_agreed.coupang) {
+    return NextResponse.json({ error: '필수 약관에 모두 동의해주세요.' }, { status: 400 });
+  }
+
+  // 배송비는 서버에서 배송지 기반으로 재계산 (클라이언트 값 신뢰하지 않음)
+  const shipping_fee = getDomesticShippingFee(shipping_address);
+
+  const normalizedBusinessInfo: BusinessInfo = {
+    company_name: business_info.company_name,
+    registration_number: regDigits.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'),
+    representative: business_info.representative,
+    business_type: business_info.business_type,
+    business_item: business_info.business_item,
+    address: business_info.address,
+  };
 
   // 최근 10초 내 동일 사용자의 주문이 있는지 확인 (중복 방지)
   const { data: recentOrder } = await supabase
@@ -87,8 +126,15 @@ export async function POST(request: NextRequest) {
       total_cny: total_cny || 0,
       total_krw,
       service_fee: service_fee || 0,
-      shipping_fee: shipping_fee || 3000,
-      shipping_address: shipping_address || null,
+      shipping_fee,
+      shipping_address,
+      business_info: normalizedBusinessInfo,
+      terms_agreed: {
+        terms: true,
+        privacy: true,
+        coupang: true,
+        agreed_at: new Date().toISOString(),
+      },
     })
     .select()
     .single();

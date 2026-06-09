@@ -130,6 +130,10 @@ export interface SourcingProduct {
   service_tags?: string[];
   service_labels?: string[];
   product_props?: Array<Record<string, string>>;
+  /** 단위 무게(kg) — TMAPI delivery_info.unit_weight */
+  weight_kg?: number;
+  /** 사이즈/규격 — product_props 내 尺寸/规格/包装尺寸 등에서 추출(있을 때만) */
+  dimensions?: string;
   tier_prices?: Array<{ begin_num: number; price_cny: number; price_krw: number }>;
   // ─ Phase 1: 신뢰 시그널 / 배지 ─
   badges?: SourcingBadge[];
@@ -216,6 +220,24 @@ export interface SourcingOrderItem {
   quantity: number;
   price_cny: number;
   price_krw: number;
+}
+
+/** B2B 결제 시 입력하는 주문자 사업자 정보 (필수) */
+export interface BusinessInfo {
+  company_name: string;        // 상호
+  registration_number: string; // 사업자등록번호 (10자리)
+  representative: string;      // 대표자명
+  business_type: string;       // 업태
+  business_item: string;       // 종목
+  address: string;             // 사업장 주소
+}
+
+/** 약관 동의 스냅샷 */
+export interface TermsAgreed {
+  terms: boolean;    // 이용약관
+  privacy: boolean;  // 개인정보 처리방침
+  coupang: boolean;  // 쿠팡 로켓그로스 관련 안내
+  agreed_at: string; // 동의 시각 ISO
 }
 
 export interface ExchangeRate {

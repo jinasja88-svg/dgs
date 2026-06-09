@@ -2,36 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, User, LogOut, ShoppingCart, Search, TrendingUp, FileText, Heart, ClipboardList } from 'lucide-react';
+import { Menu, User, LogOut, ShoppingCart } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { getCartCount } from '@/lib/cart';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import MobileMenu from './MobileMenu';
-import HistoryDropdown from './HistoryDropdown';
-
-const navItems = [
-  { label: '아이템검색', href: '/shop', icon: Search },
-  { label: '쿠팡분석', href: '/coupang', icon: TrendingUp },
-  { label: '상세페이지', href: '/detail-generator', icon: FileText },
-  { label: '내찜목록', href: '/wishlist', icon: Heart },
-  { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },
-];
-
-// sourcing 관련 라우트에서만 네비 표시
-const SOURCING_PREFIXES = ['/shop', '/coupang', '/detail-generator', '/wishlist', '/sourcing-orders', '/cart'];
-const HIDE_NAV_PREFIXES = ['/admin', '/login', '/signup', '/reset-password'];
 
 export default function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [cartCount, setCartCount] = useState(0);
-  const pathname = usePathname();
   const supabase = createClient();
-
-  const showNav = !HIDE_NAV_PREFIXES.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -86,31 +69,6 @@ export default function Header() {
                 </svg>
                 <span className="hidden sm:inline">딸깍소싱</span>
               </Link>
-
-              {/* Desktop Nav */}
-              {showNav && (
-                <nav className="hidden md:flex items-center ml-4 lg:ml-6 gap-0.5">
-                  {navItems.map((item) => {
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-[var(--radius-md)] text-sm font-medium transition-colors whitespace-nowrap',
-                          isActive
-                            ? 'text-primary bg-primary-5'
-                            : 'text-text-secondary hover:text-primary hover:bg-surface'
-                        )}
-                      >
-                        <item.icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-primary' : 'text-text-tertiary')} />
-                        <span className="hidden lg:inline">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                  <HistoryDropdown />
-                </nav>
-              )}
             </div>
 
             {/* Right: Cart + Auth */}

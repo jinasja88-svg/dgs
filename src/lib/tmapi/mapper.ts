@@ -210,6 +210,25 @@ export function mapItemDetailToSourcingProduct(
   const isReturn7d = tagsHas(tags, /7daysReturn/i, /7day/i, /return/i);
   const is1688Select = tagsHas(tags, /1688Select/i, /select1688/i);
 
+  // 무게: TMAPI delivery_info.unit_weight (kg)
+  const weightKg =
+    typeof detail.delivery_info?.unit_weight === 'number' && detail.delivery_info.unit_weight > 0
+      ? detail.delivery_info.unit_weight
+      : undefined;
+
+  // 사이즈/규격: product_props 에서 치수 관련 키 추출 (셀러 입력 의존)
+  const dimensionRe = /尺寸|规格|包装尺寸|长宽高|尺码|사이즈|규격/;
+  let dimensions: string | undefined;
+  for (const row of detail.product_props || []) {
+    for (const [k, v] of Object.entries(row)) {
+      if (dimensionRe.test(k) && v) {
+        dimensions = String(v);
+        break;
+      }
+    }
+    if (dimensions) break;
+  }
+
   return {
     product_id: String(detail.item_id),
     title: detail.title,
@@ -230,6 +249,8 @@ export function mapItemDetailToSourcingProduct(
     service_tags: tags || [],
     service_labels: buildServiceLabels(tags),
     product_props: detail.product_props || [],
+    weight_kg: weightKg,
+    dimensions,
     tier_prices: detail.tiered_price_info?.prices?.map((p) => ({
       begin_num: p.begin_num,
       price_cny: parseFloat(p.price) || priceCny,

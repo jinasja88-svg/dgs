@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, FileText, Heart, ClipboardList, Clock, History, X, TrendingUp } from 'lucide-react';
+import { Clock, History, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/utils';
 import { getRecentlyViewed, clearRecentlyViewed } from '@/lib/recently-viewed';
 import type { RecentlyViewedItem } from '@/lib/recently-viewed';
+import { navItems, isActivePath } from '@/lib/navigation';
+import SidebarNav from '@/components/layout/SidebarNav';
+import SourcingSearchBar from '@/components/sourcing/SourcingSearchBar';
 
 const RECENT_SEARCHES_KEY = 'ddalkkak-recent-searches';
 
@@ -19,13 +22,7 @@ function proxyImg(url: string): string {
   return url;
 }
 
-const bottomNavItems = [
-  { label: '아이템검색', href: '/shop', icon: Search },
-  { label: '쿠팡분석', href: '/coupang', icon: TrendingUp },
-  { label: '상세페이지', href: '/detail-generator', icon: FileText },
-  { label: '내찜목록', href: '/wishlist', icon: Heart },
-  { label: '내주문목록', href: '/sourcing-orders', icon: ClipboardList },
-];
+const bottomNavItems = navItems;
 
 export default function SourcingLayout({
   children,
@@ -61,8 +58,11 @@ export default function SourcingLayout({
 
   const handleSearchClick = (term: string) => {
     setMobileHistoryOpen(false);
-    router.push(`/shop?keyword=${encodeURIComponent(term)}`);
+    router.push(`/shop?q=${encodeURIComponent(term)}`);
   };
+
+  // 상품 상세·도구 페이지에는 전역 검색바 노출 (shop 목록은 자체 검색 보유)
+  const showGlobalSearch = pathname !== '/shop';
 
   const removeRecent = (term: string) => {
     const next = recentSearches.filter((k) => k !== term);
@@ -208,10 +208,18 @@ export default function SourcingLayout({
         </button>
       </nav>
 
-      {/* Main Content */}
-      <main className="bg-surface min-h-[calc(100vh-64px)] pb-16 md:pb-0">
-        {children}
-      </main>
+      {/* Desktop sidebar + main content */}
+      <div className="md:flex">
+        <SidebarNav />
+        <main className="flex-1 min-w-0 bg-surface min-h-[calc(100vh-64px)] pb-16 md:pb-0">
+          {showGlobalSearch && (
+            <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+              <SourcingSearchBar variant="compact" />
+            </div>
+          )}
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

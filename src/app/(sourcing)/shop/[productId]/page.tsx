@@ -393,6 +393,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
               </div>
             )}
 
+            {(displayProduct!.weight_kg || displayProduct!.dimensions) && (
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6 text-sm">
+                {displayProduct!.weight_kg && (
+                  <div>
+                    <span className="text-text-tertiary">단위 무게 </span>
+                    <span className="text-text-primary font-medium">{displayProduct!.weight_kg}kg</span>
+                  </div>
+                )}
+                {displayProduct!.dimensions && (
+                  <div>
+                    <span className="text-text-tertiary">규격 </span>
+                    <span className="text-text-primary font-medium">{displayProduct!.dimensions}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {displayProduct!.tier_prices && displayProduct!.tier_prices.length > 0 && (
               <div className="mb-6">
                 <label className="text-sm font-medium text-text-primary mb-2 block">구간 단가</label>
