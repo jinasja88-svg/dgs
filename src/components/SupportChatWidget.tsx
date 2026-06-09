@@ -122,6 +122,27 @@ export default function SupportChatWidget() {
     };
   }, [open, user, scrollToBottom]);
 
+  // 폴링 폴백 — 실시간 구독이 실패해도 관리자 답변을 수초 내 수신
+  useEffect(() => {
+    if (!open || !conversationId) return;
+    const supabase = supabaseRef.current;
+    const poll = async () => {
+      const { data } = await supabase
+        .from('cs_chat_messages')
+        .select('id, conversation_id, sender, body, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+      if (!data) return;
+      setMessages((prev) => {
+        if (prev.length === (data as ChatMessage[]).length) return prev;
+        scrollToBottom();
+        return data as ChatMessage[];
+      });
+    };
+    const t = setInterval(poll, 4000);
+    return () => clearInterval(t);
+  }, [open, conversationId, scrollToBottom]);
+
   const handleSend = async () => {
     const body = input.trim();
     if (!body || !conversationId || !user || sending) return;

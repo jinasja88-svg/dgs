@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Send, MessagesSquare } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import type { User } from '@supabase/supabase-js';
 
 interface Conversation {
   id: string;
@@ -13,6 +11,7 @@ interface Conversation {
   last_message: string | null;
   last_message_at: string | null;
   unread_admin: number;
+  profile: { name: string | null; email: string | null };
 }
 
 interface ChatMessage {
@@ -23,16 +22,18 @@ interface ChatMessage {
   created_at: string;
 }
 
+const LIST_POLL_MS = 4000;
+const MSG_POLL_MS = 3000;
+
 export default function AdminChatPage() {
-  const supabaseRef = useRef(createClient());
-  const [admin, setAdmin] = useState<User | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, { email: string; name: string | null }>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<string | null>(null);
+  selectedRef.current = selectedId;
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -42,116 +43,92 @@ export default function AdminChatPage() {
   }, []);
 
   const loadConversations = useCallback(async () => {
-    const supabase = supabaseRef.current;
-    const { data } = await supabase
-      .from('cs_chat_conversations')
-      .select('id, user_id, status, last_message, last_message_at, unread_admin')
-      .order('last_message_at', { ascending: false });
-    const list = (data as Conversation[]) ?? [];
-    setConversations(list);
-
-    // 사용자 프로필(이메일/이름) 매핑 — RLS 로 일부만 보일 수 있음(없으면 id 폴백)
-    const ids = Array.from(new Set(list.map((c) => c.user_id)));
-    if (ids.length) {
-      const { data: profs } = await supabase
-        .from('profiles')
-        .select('id, email, name')
-        .in('id', ids);
-      const map: Record<string, { email: string; name: string | null }> = {};
-      for (const p of profs ?? []) map[p.id] = { email: p.email, name: p.name };
-      setProfiles(map);
-    }
+    try {
+      const res = await fetch('/api/admin/chat', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      setConversations(data.conversations ?? []);
+    } catch {}
   }, []);
 
-  // 초기 로드 + 대화방 실시간 갱신
-  useEffect(() => {
-    const supabase = supabaseRef.current;
-    supabase.auth.getUser().then(({ data }) => setAdmin(data.user));
-    loadConversations();
+  const loadMessages = useCallback(
+    async (convId: string, scroll = false) => {
+      try {
+        const res = await fetch(`/api/admin/chat?conversation_id=${convId}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        setMessages((prev) => {
+          const next = (data.messages as ChatMessage[]) ?? [];
+          if (prev.length !== next.length) {
+            if (scroll || next.length > prev.length) scrollToBottom();
+            return next;
+          }
+          return prev;
+        });
+      } catch {}
+    },
+    [scrollToBottom]
+  );
 
-    const channel = supabase
-      .channel('admin:cs_chat_conversations')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cs_chat_conversations' }, () => {
-        loadConversations();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+  // 대화 목록 폴링
+  useEffect(() => {
+    loadConversations();
+    const t = setInterval(loadConversations, LIST_POLL_MS);
+    return () => clearInterval(t);
   }, [loadConversations]);
 
-  // 선택 대화방 메시지 로드 + 실시간 구독
+  // 선택 대화 메시지 폴링
   useEffect(() => {
     if (!selectedId) return;
-    const supabase = supabaseRef.current;
-    let active = true;
-
-    (async () => {
-      const { data } = await supabase
-        .from('cs_chat_messages')
-        .select('id, conversation_id, sender, body, created_at')
-        .eq('conversation_id', selectedId)
-        .order('created_at', { ascending: true });
-      if (!active) return;
-      setMessages((data as ChatMessage[]) ?? []);
-      scrollToBottom();
-      await supabase.from('cs_chat_conversations').update({ unread_admin: 0 }).eq('id', selectedId);
-    })();
-
-    const channel = supabase
-      .channel(`admin:cs_chat:${selectedId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'cs_chat_messages', filter: `conversation_id=eq.${selectedId}` },
-        (payload) => {
-          const m = payload.new as ChatMessage;
-          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          scrollToBottom();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
-  }, [selectedId, scrollToBottom]);
+    loadMessages(selectedId, true);
+    const t = setInterval(() => loadMessages(selectedId), MSG_POLL_MS);
+    return () => clearInterval(t);
+  }, [selectedId, loadMessages]);
 
   const handleSend = async () => {
-    const body = input.trim();
-    if (!body || !selectedId || !admin || sending) return;
+    const text = input.trim();
+    if (!text || !selectedId || sending) return;
     setSending(true);
     setInput('');
-    const { error } = await supabaseRef.current.from('cs_chat_messages').insert({
-      conversation_id: selectedId,
-      sender: 'admin',
-      sender_id: admin.id,
-      body,
-    });
-    if (error) setInput(body);
-    setSending(false);
+    try {
+      const res = await fetch('/api/admin/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: selectedId, body: text }),
+      });
+      if (res.ok) {
+        const m = (await res.json()) as ChatMessage;
+        setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+        scrollToBottom();
+        loadConversations();
+      } else {
+        setInput(text);
+      }
+    } catch {
+      setInput(text);
+    } finally {
+      setSending(false);
+    }
   };
 
-  const label = (c: Conversation) => {
-    const p = profiles[c.user_id];
-    return p?.name || p?.email || `사용자 ${c.user_id.slice(0, 8)}`;
-  };
+  const label = (c: Conversation) =>
+    c.profile.name || c.profile.email || `사용자 ${c.user_id.slice(0, 8)}`;
 
   return (
     <div>
       <h1 className="text-xl font-bold text-text-primary mb-1">실시간 상담</h1>
-      <p className="text-sm text-text-tertiary mb-5">고객 문의에 실시간으로 응대합니다.</p>
+      <p className="text-sm text-text-tertiary mb-5">고객 문의에 실시간으로 응대합니다. (자동 새로고침)</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[420px]">
+      <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[420px]">
         {/* 대화 목록 */}
         <div className="bg-white border border-border rounded-[var(--radius-lg)] overflow-y-auto">
           {conversations.length === 0 ? (
-            <p className="text-sm text-text-tertiary text-center py-10">대화가 없습니다.</p>
+            <p className="text-sm text-text-tertiary text-center py-10">아직 문의가 없습니다.</p>
           ) : (
             conversations.map((c) => (
               <button
                 key={c.id}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => { setSelectedId(c.id); setMessages([]); }}
                 className={cn(
                   'w-full text-left px-4 py-3 border-b border-border-light hover:bg-surface transition-colors',
                   selectedId === c.id && 'bg-primary-5'
@@ -159,12 +136,15 @@ export default function AdminChatPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium text-text-primary truncate">{label(c)}</span>
-                  {c.unread_admin > 0 && (
+                  {c.unread_admin > 0 && selectedId !== c.id && (
                     <span className="flex-shrink-0 min-w-5 h-5 px-1.5 bg-primary text-white text-[11px] font-bold rounded-full flex items-center justify-center">
                       {c.unread_admin}
                     </span>
                   )}
                 </div>
+                {c.profile.email && c.profile.name && (
+                  <p className="text-[11px] text-text-tertiary truncate">{c.profile.email}</p>
+                )}
                 <p className="text-xs text-text-tertiary truncate mt-0.5">{c.last_message || '—'}</p>
               </button>
             ))
@@ -181,20 +161,24 @@ export default function AdminChatPage() {
           ) : (
             <>
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-surface">
-                {messages.map((m) => (
-                  <div key={m.id} className={m.sender === 'admin' ? 'flex justify-end' : 'flex justify-start'}>
-                    <div
-                      className={cn(
-                        'max-w-[70%] px-3 py-2 rounded-[var(--radius-md)] text-sm whitespace-pre-wrap break-words',
-                        m.sender === 'admin'
-                          ? 'bg-primary text-white rounded-br-sm'
-                          : 'bg-white border border-hairline text-ink rounded-bl-sm'
-                      )}
-                    >
-                      {m.body}
+                {messages.length === 0 ? (
+                  <p className="text-center text-xs text-text-tertiary py-6">메시지를 불러오는 중...</p>
+                ) : (
+                  messages.map((m) => (
+                    <div key={m.id} className={m.sender === 'admin' ? 'flex justify-end' : 'flex justify-start'}>
+                      <div
+                        className={cn(
+                          'max-w-[70%] px-3 py-2 rounded-[var(--radius-md)] text-sm whitespace-pre-wrap break-words',
+                          m.sender === 'admin'
+                            ? 'bg-primary text-white rounded-br-sm'
+                            : 'bg-white border border-hairline text-ink rounded-bl-sm'
+                        )}
+                      >
+                        {m.body}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               <form
                 onSubmit={(e) => { e.preventDefault(); handleSend(); }}
