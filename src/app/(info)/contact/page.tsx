@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { Headphones } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { openSupportChat } from '@/lib/support-chat';
 
 export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,9 +26,18 @@ export default function ContactPage() {
       <Breadcrumb items={[{ label: '홈', href: '/' }, { label: '문의하기' }]} />
 
       <h1 className="text-3xl font-bold text-text-primary mt-6 mb-2">문의하기</h1>
-      <p className="text-text-tertiary mb-8">
-        궁금한 점이 있으시면 아래 양식을 작성해주세요.
+      <p className="text-text-tertiary mb-5">
+        빠른 답변이 필요하시면 실시간 상담을, 그 외에는 아래 양식을 이용해주세요.
       </p>
+
+      <button
+        type="button"
+        onClick={openSupportChat}
+        className="flex items-center gap-2 mb-8 px-4 py-3 w-full sm:w-auto justify-center bg-primary-5 text-primary text-sm font-semibold rounded-[var(--radius-md)] hover:bg-primary/10 transition-colors"
+      >
+        <Headphones className="w-4 h-4" />
+        실시간 상담 시작하기
+      </button>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">

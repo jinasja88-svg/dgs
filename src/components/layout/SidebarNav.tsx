@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Headphones, BookOpen } from 'lucide-react';
 import { navItems, isActivePath } from '@/lib/navigation';
-import { openCustomerSupport } from '@/lib/channel-talk';
+import { openSupportChat } from '@/lib/support-chat';
 import { cn } from '@/lib/utils';
 
 /**
@@ -57,7 +57,7 @@ export default function SidebarNav() {
 
         <button
           type="button"
-          onClick={openCustomerSupport}
+          onClick={openSupportChat}
           className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] text-sm font-medium text-text-secondary hover:text-primary hover:bg-surface transition-colors text-left"
         >
           <Headphones className="w-[18px] h-[18px] flex-shrink-0 text-text-tertiary" />

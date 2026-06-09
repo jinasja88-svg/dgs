@@ -239,6 +239,77 @@ export type Database = {
           },
         ]
       }
+      cs_chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          last_message: string | null
+          last_message_at: string | null
+          status: string
+          unread_admin: number
+          unread_user: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          status?: string
+          unread_admin?: number
+          unread_user?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message?: string | null
+          last_message_at?: string | null
+          status?: string
+          unread_admin?: number
+          unread_user?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cs_chat_messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender: string
+          sender_id: string | null
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender: string
+          sender_id?: string | null
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender?: string
+          sender_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "cs_chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cs_faqs: {
         Row: {
           answer: string
@@ -908,7 +979,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

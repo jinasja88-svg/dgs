@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, LayoutDashboard, MessageCircle, Package, ShoppingBag, Users, BarChart3, Bell } from 'lucide-react';
+import { Activity, LayoutDashboard, MessageCircle, MessagesSquare, Package, ShoppingBag, Users, BarChart3, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 
@@ -17,6 +17,7 @@ const adminNavItems = [
 // 데스크톱 사이드바 전용 항목 (모바일 하단 탭에는 표시 안 함)
 const adminSidebarOnlyItems = [
   { label: 'CS 관리', href: '/admin/cs', icon: MessageCircle },
+  { label: '실시간 상담', href: '/admin/chat', icon: MessagesSquare },
   { label: '정산', href: '/admin/settlement', icon: BarChart3 },
   { label: '공지 관리', href: '/admin/notices', icon: Bell },
 ];

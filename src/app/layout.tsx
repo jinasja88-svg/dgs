@@ -3,7 +3,7 @@ import './globals.css';
 import Providers from './providers';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import ChannelTalkBoot from '@/components/ChannelTalkBoot';
+import SupportChatWidget from '@/components/SupportChatWidget';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -38,7 +38,7 @@ export default function RootLayout({
           <Header />
           <div className="min-h-[calc(100vh-64px)]">{children}</div>
           <Footer />
-          <ChannelTalkBoot />
+          <SupportChatWidget />
         </Providers>
       </body>
     </html>

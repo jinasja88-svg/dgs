@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Headphones } from 'lucide-react';
-import { openCustomerSupport } from '@/lib/channel-talk';
+import { openSupportChat } from '@/lib/support-chat';
 
 const infoLinks = [
   { label: '회사소개', href: '/about' },
@@ -34,7 +34,7 @@ export default function Footer() {
             ))}
             <button
               type="button"
-              onClick={openCustomerSupport}
+              onClick={openSupportChat}
               className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
             >
               <Headphones className="w-3.5 h-3.5" />
