@@ -11,8 +11,8 @@ function LoginContent() {
   const redirect = searchParams.get('redirect') || '/mypage';
   const queryError = searchParams.get('error');
   const [hashError, setHashError] = useState<string | null>(null);
-  const [agreeTerms, setAgreeTerms] = useState(false);
-  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreePrivacy, setAgreePrivacy] = useState(true);
 
   const canLogin = agreeTerms && agreePrivacy;
 
