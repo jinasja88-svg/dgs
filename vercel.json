@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/translation-prewarm?top=5",
+      "schedule": "0 18 * * 1,4"
+    }
+  ]
+}

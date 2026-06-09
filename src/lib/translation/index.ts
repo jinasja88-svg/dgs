@@ -5,9 +5,12 @@
  */
 
 import type { SourcingProduct } from '@/types';
-import { translateZhToKo, translateKoToZh, translateZhToKoBatch } from './papago';
+import { translateZhToKo, translateKoToZh, translateZhToKoBatch } from './translator';
 import { lookupZhToKo, containsChinese, containsKorean } from './lookup';
 import { getCachedAsync, setCachedAsync } from './cache';
+
+// 프리웜 등 별도 예산 경로에서 번역 출처(live/prewarm)를 지정할 때 사용
+export { runWithTranslationSource } from './translator';
 
 // Supabase 캐시를 통한 중국어→한국어 번역 (단일 텍스트)
 async function zhToKoCached(text: string): Promise<string> {

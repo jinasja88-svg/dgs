@@ -72,7 +72,7 @@ Previously used for direct 1688 MTOP protocol calls via Squid proxy. Now replace
 | Route | Purpose |
 |-------|---------|
 | `search` | Keyword search — translates Korean→Chinese, calls TMAPI, caches 5 min |
-| `product/[id]` | Product detail — TMAPI with `language=ko`, caches 15 min, no Papago needed |
+| `product/[id]` | Product detail — TMAPI with `language=ko`, caches 15 min (title already Korean) |
 | `image-search` | Image URL search via TMAPI, translates results, caches 10 min |
 | `orders` | GET list / POST create sourcing order (accepts `items[]` array for cart checkout) |
 | `orders/[id]` | GET / PATCH single order (status, tracking, admin note, cancellation) |
@@ -113,7 +113,8 @@ const result = await logApiCall('search', () => client.searchByKeyword(params));
 ### Exchange Rate & Translation
 
 - **`src/lib/exchange-rate.ts`** — Fetches CNY→KRW rate with 1-hour in-memory cache. Falls back to 208 KRW/CNY.
-- **`src/lib/translation/`** — Korean↔Chinese via Naver Papago API. Pipeline: static lookup table (`lookup.ts`) → in-memory LRU cache → Papago API call. `translateProducts(products, { skipSkus: true })` used in search/image-search routes (SKU translation only on product detail). Concurrency: 15 products at a time.
+- **`src/lib/translation/`** — Korean↔Chinese machine translation via HuggingFace chat completions (`translator.ts`; model from `TRANSLATION_MODEL`, default `Qwen/Qwen2.5-7B-Instruct`). Pipeline: static lookup table (`lookup.ts`) → Supabase persistent cache (`cache.ts`, `translation_cache` table) → HF API call. Daily call budget guarded by `translation_api_usage_daily` (`TRANSLATION_DAILY_LIMIT`). `translateProducts(products, { skipSkus: true })` translates product titles in the search route.
+- **Translation prewarm** — `/api/admin/translation-prewarm` (GET/POST, cron `CRON_SECRET` or admin) pre-translates popular `search_history` keywords + default/category first pages into the permanent cache, using a **separate** `prewarm` budget (`TRANSLATION_PREWARM_DAILY_LIMIT`) via `runWithTranslationSource` (`AsyncLocalStorage`). Live search and prewarm share `runKeywordSearch()` in `src/lib/sourcing/search.ts` so cache keys never drift. Scheduled in `vercel.json`. See `docs/translation-prewarm.md`.
 
 ### Client-Side State
 
@@ -154,8 +155,11 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY      # Required for api-logger and admin operations
 TMAPI_API_TOKEN                # TMAPI (api.tmapi.io) subscription token
-NAVER_CLIENT_ID                # Papago translation
-NAVER_CLIENT_SECRET
+HF_API_TOKEN                   # HF Inference Providers token for sourcing translation
+TRANSLATION_MODEL              # Optional — default Qwen/Qwen2.5-7B-Instruct
+TRANSLATION_DAILY_LIMIT        # Optional — default 200 HF translation calls/day, 0 disables, -1 unlimited
+TRANSLATION_PREWARM_DAILY_LIMIT # Optional — default 1000 prewarm translation calls/day (separate budget from live)
+CRON_SECRET                    # Bearer secret for /api/admin/translation-prewarm cron/manual trigger
 ADMIN_EMAILS                   # Comma-separated admin email whitelist
 LLM_PROVIDER                   # huggingface (default) or gemini
 HUGGINGFACE_API_TOKEN          # HF Serverless API token (hf_...)
