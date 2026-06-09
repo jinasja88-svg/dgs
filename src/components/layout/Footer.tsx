@@ -20,7 +20,7 @@ export default function Footer() {
         {/* 상단: 브랜드 + 링크 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
           <Link href="/" className="text-lg font-bold text-primary">
-            딸깍시스터즈
+            주식회사네이처발란스
           </Link>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {infoLinks.map((link) => (
@@ -85,8 +85,7 @@ export default function Footer() {
           <div>
             <p className="text-[11px] font-semibold text-text-secondary mb-1.5">결제 정보</p>
             <p className="text-[11px] text-text-tertiary leading-relaxed">
-              무통장 입금 계좌 국민은행 89700100094208 주식회사네이처발란스<br />
-              호스팅 제공 Cafe24 Corp.
+              무통장 입금 계좌 국민은행 89700100094208 주식회사네이처발란스
             </p>
           </div>
         </div>
@@ -94,7 +93,7 @@ export default function Footer() {
         {/* 하단: 카피라이트 */}
         <div className="pt-5 text-center">
           <p className="text-[11px] text-text-tertiary">
-            Copyright © {new Date().getFullYear()} 딸깍시스터즈. All Rights Reserved.
+            Copyright © {new Date().getFullYear()} 주식회사네이처발란스. All Rights Reserved.
           </p>
         </div>
 
