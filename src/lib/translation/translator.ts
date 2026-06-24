@@ -1,7 +1,7 @@
 /**
  * Groq Inference API 번역 클라이언트
  * 환경변수: GROQ_API_KEY
- * 모델: TRANSLATION_MODEL 또는 qwen/qwen3.6-27b (CJK 번역 최적화)
+ * 모델: TRANSLATION_MODEL 또는 meta-llama/llama-4-scout-17b-16e-instruct
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase-admin';
 import { getEcommerceGlossaryPrompt } from './lookup';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_MODEL = 'qwen/qwen3.6-27b';
+const DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const DEFAULT_DAILY_LIMIT = 200;
 const DEFAULT_PREWARM_DAILY_LIMIT = 1000;
 
@@ -160,8 +160,7 @@ async function groqCall(
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          // /no_think: Qwen3 thinking 모드 비활성화 (불필요한 토큰 절감)
-          { role: 'user', content: `/no_think ${userContent}` },
+          { role: 'user', content: userContent },
         ],
         max_tokens: maxTokens,
         temperature: 0.1,
