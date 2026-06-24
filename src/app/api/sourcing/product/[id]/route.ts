@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { CACHE_TTL, mapItemDetailToSourcingProduct, getCachedItemDetail } from '@/lib/tmapi';
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { getCached, setCached } from '@/lib/persistent-cache';
+import { translateProducts } from '@/lib/translation';
 import type { SourcingProduct } from '@/types';
 
 export async function GET(
@@ -23,7 +24,8 @@ export async function GET(
       getCachedItemDetail(id, 'ko'),
     ]);
 
-    const product = mapItemDetailToSourcingProduct(detail, exchangeRate);
+    const mapped = mapItemDetailToSourcingProduct(detail, exchangeRate);
+    const [product] = await translateProducts([mapped]);
 
     await setCached(cacheKey, product, CACHE_TTL.DETAIL);
 
