@@ -1,15 +1,15 @@
 /**
- * HuggingFace Inference API 번역 클라이언트
- * 환경변수: HF_API_TOKEN
- * 모델: TRANSLATION_MODEL 또는 Qwen/Qwen2.5-7B-Instruct via featherless-ai provider
+ * Groq Inference API 번역 클라이언트
+ * 환경변수: GROQ_API_KEY
+ * 모델: TRANSLATION_MODEL 또는 qwen/qwen3.6-27b (CJK 번역 최적화)
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAdminClient } from '@/lib/supabase-admin';
 import { getEcommerceGlossaryPrompt } from './lookup';
 
-const HF_ROUTER_URL = 'https://router.huggingface.co/featherless-ai/v1/chat/completions';
-const DEFAULT_MODEL = 'Qwen/Qwen2.5-7B-Instruct';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_MODEL = 'qwen/qwen3.6-27b';
 const DEFAULT_DAILY_LIMIT = 200;
 const DEFAULT_PREWARM_DAILY_LIMIT = 1000;
 
@@ -135,13 +135,13 @@ Rules:
 const KO_TO_ZH_SYSTEM_PROMPT = `Translate Korean shopping search keywords into concise Simplified Chinese keywords for 1688 product search.
 Reply only with the Chinese keywords, no explanation.`;
 
-async function hfCall(
+async function groqCall(
   systemPrompt: string,
   userContent: string,
   maxTokens = 200,
   options: { direction: TranslationDirection; textItems?: number }
 ): Promise<string | null> {
-  const token = process.env.HF_API_TOKEN;
+  const token = process.env.GROQ_API_KEY;
   if (!token) return null;
 
   const model = getModel();
@@ -150,7 +150,7 @@ async function hfCall(
   if (!allowed) return null;
 
   try {
-    const res = await fetch(HF_ROUTER_URL, {
+    const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -160,7 +160,8 @@ async function hfCall(
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
+          // /no_think: Qwen3 thinking 모드 비활성화 (불필요한 토큰 절감)
+          { role: 'user', content: `/no_think ${userContent}` },
         ],
         max_tokens: maxTokens,
         temperature: 0.1,
@@ -178,7 +179,7 @@ async function hfCall(
 
 export async function translateZhToKo(text: string): Promise<string> {
   if (!text.trim()) return text;
-  const result = await hfCall(
+  const result = await groqCall(
     ZH_TO_KO_SYSTEM_PROMPT,
     text,
     200,
@@ -199,7 +200,7 @@ export async function translateZhToKoBatch(texts: string[]): Promise<string[]> {
   const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join('\n');
   const maxTokens = texts.length * 60 + 100;
 
-  const result = await hfCall(
+  const result = await groqCall(
     `${ZH_TO_KO_SYSTEM_PROMPT}
 For this batch, output ONLY the numbered translations in the same format, one per line. Example:
 1. 한국어번역
@@ -229,7 +230,7 @@ For this batch, output ONLY the numbered translations in the same format, one pe
 
 export async function translateKoToZh(text: string): Promise<string> {
   if (!text.trim()) return text;
-  const result = await hfCall(
+  const result = await groqCall(
     KO_TO_ZH_SYSTEM_PROMPT,
     text,
     80,
