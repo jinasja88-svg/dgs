@@ -165,6 +165,34 @@ export async function translateProducts(
   return Promise.all(products.map((p, i) => translateProduct({ ...p, title: titleResults[i] }, false)));
 }
 
+// product_props (Array<Record<string,string>>) 를 한 번의 배치 호출로 번역
+async function translateProductProps(
+  props: Array<Record<string, string>> | undefined
+): Promise<Array<Record<string, string>> | undefined> {
+  if (!props?.length) return props;
+
+  // 모든 키/값을 평탄화하여 단일 배치로 번역
+  const allTexts: string[] = [];
+  for (const prop of props) {
+    for (const [k, v] of Object.entries(prop)) {
+      allTexts.push(k, v);
+    }
+  }
+
+  const translated = await translateBatch(allTexts);
+
+  // 번역 결과를 원래 구조로 복원
+  let cursor = 0;
+  return props.map((prop) => {
+    const entries = Object.entries(prop).map(() => {
+      const tk = translated[cursor++];
+      const tv = translated[cursor++];
+      return [tk, tv] as [string, string];
+    });
+    return Object.fromEntries(entries);
+  });
+}
+
 async function translateProduct(product: SourcingProduct, skipSkus = false): Promise<SourcingProduct> {
   const sellerHasChinese = !!(product.seller?.location && containsChinese(product.seller.location));
   const [titleKo, locationKo] = await Promise.all([
@@ -185,23 +213,26 @@ async function translateProduct(product: SourcingProduct, skipSkus = false): Pro
     };
   }
 
-  const translatedSkus = await Promise.all(
-    product.skus.map(async (sku) => {
-      const translatedProperties = sku.properties
-        ? await translateProperties(sku.properties)
-        : undefined;
+  const [translatedSkus, translatedProductProps] = await Promise.all([
+    Promise.all(
+      product.skus.map(async (sku) => {
+        const translatedProperties = sku.properties
+          ? await translateProperties(sku.properties)
+          : undefined;
 
-      const translatedName = translatedProperties
-        ? Object.values(translatedProperties).join(' / ')
-        : await zhToKoCached(sku.name);
+        const translatedName = translatedProperties
+          ? Object.values(translatedProperties).join(' / ')
+          : await zhToKoCached(sku.name);
 
-      return {
-        ...sku,
-        name: translatedName,
-        properties: translatedProperties,
-      };
-    })
-  );
+        return {
+          ...sku,
+          name: translatedName,
+          properties: translatedProperties,
+        };
+      })
+    ),
+    translateProductProps(product.product_props),
+  ]);
 
   return {
     ...product,
@@ -209,5 +240,6 @@ async function translateProduct(product: SourcingProduct, skipSkus = false): Pro
     title_zh: product.title_zh ?? product.title,
     skus: translatedSkus,
     seller: translatedSeller,
+    product_props: translatedProductProps ?? product.product_props,
   };
 }
