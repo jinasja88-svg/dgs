@@ -27,6 +27,14 @@ export interface CoupangProduct {
   crawled_at: string;
 }
 
+// 캐스케이드 카테고리 셀렉터 트리 노드 (/api/coupang/category-tree)
+export interface CatNode {
+  name: string;
+  path: string; // 전체 경로 prefix (예: "가전디지털>영상가전")
+  depth: number; // 1..4
+  children: CatNode[];
+}
+
 export type DeliveryType = 'wing' | 'rocket_normal' | 'rocket_pro';
 export type RocketSize = 'xSmall' | 'small' | 'midium' | 'large' | 'xLarge' | 'xxLarge';
 
@@ -45,4 +53,6 @@ export type CoupangSortKey =
   | 'estimated_monthly_revenue'
   | 'price'
   | 'review_count'
-  | 'buy_count';
+  | 'buy_count'
+  | 'conversion_rate'
+  | 'product_name';

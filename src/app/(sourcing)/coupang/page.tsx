@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ShoppingBag } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ShoppingBag, X } from 'lucide-react';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import Pagination from '@/components/ui/Pagination';
 import { cn, formatPrice } from '@/lib/utils';
-import type { CoupangProduct, CoupangSortKey, DeliveryType, RocketSize } from '@/lib/coupang/types';
+import { getScopedJSON, setScopedJSON } from '@/lib/client-scope';
+import type { CoupangProduct, CoupangSortKey, CatNode, DeliveryType, RocketSize } from '@/lib/coupang/types';
 import { getCommission, getShipFee, calcProfit, calcMargin, calcROAS } from '@/lib/coupang/profitability';
 import type { PaginatedResponse } from '@/types';
 
@@ -35,6 +36,15 @@ function roasClass(roas: number | null): string {
   return 'text-red-500 font-semibold';
 }
 
+// 전환율 출처별 색상/툴팁
+function convMeta(source: string | null | undefined): { cls: string; title: string } {
+  if (source === 'cat2') return { cls: 'text-blue-600', title: '중분류 기반' };
+  if (source === 'cat1') return { cls: 'text-orange-500', title: '대분류 기반' };
+  return { cls: 'text-text-tertiary', title: '전체 평균' };
+}
+
+const COUPANG_SEARCH = 'https://www.coupang.com/np/search?component=&q=';
+
 // ---------------------
 // 정렬 옵션
 // ---------------------
@@ -45,6 +55,7 @@ const SORT_OPTIONS: { key: CoupangSortKey; label: string }[] = [
   { key: 'estimated_monthly_revenue', label: '추정매출' },
   { key: 'price', label: '가격' },
   { key: 'review_count', label: '리뷰수' },
+  { key: 'conversion_rate', label: '전환율' },
 ];
 
 const SIZE_OPTIONS: { value: RocketSize; label: string }[] = [
@@ -56,11 +67,32 @@ const SIZE_OPTIONS: { value: RocketSize; label: string }[] = [
   { value: 'xxLarge', label: '초특대 (250cm/30kg)' },
 ];
 
+// 계정별 localStorage 상태 키 (client-scope가 계정 스코핑 담당)
+const STATE_KEY = 'ddalkkak-coupang-state';
+const FAVS_KEY = 'ddalkkak-coupang-favs';
+
+interface PersistState {
+  searchInput: string;
+  keyword: string;
+  cat: [string, string, string, string];
+  onlyCat: string;
+  excludedCats: string[];
+  minViews: string;
+  maxReviews: string;
+  excludeBrands: boolean;
+  minPrice: string;
+  maxPrice: string;
+  minSales: string;
+  sortKey: CoupangSortKey;
+  sortAsc: boolean;
+  deliveryType: DeliveryType;
+  rocketSize: RocketSize;
+}
+
 export default function CoupangPage() {
   // 필터 상태
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [category, setCategory] = useState('');
   const [minViews, setMinViews] = useState('');
   const [maxReviews, setMaxReviews] = useState('');
   const [excludeBrands, setExcludeBrands] = useState(true);
@@ -68,15 +100,14 @@ export default function CoupangPage() {
   const [maxPrice, setMaxPrice] = useState('');
   const [minSales, setMinSales] = useState('');
 
+  // 캐스케이드 카테고리 (레벨별 선택 path)
+  const [cat, setCat] = useState<[string, string, string, string]>(['', '', '', '']);
+  // 카테고리 제외 / 만보기
+  const [excludedCats, setExcludedCats] = useState<string[]>([]);
+  const [onlyCat, setOnlyCat] = useState(''); // "만 보기" 카테고리 path (l1>l2)
+
   // 즐겨찾기
-  const [favs, setFavs] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try {
-      return new Set(JSON.parse(localStorage.getItem('coupang-favs') || '[]'));
-    } catch {
-      return new Set();
-    }
-  });
+  const [favs, setFavs] = useState<Set<string>>(new Set());
   const [favOnly, setFavOnly] = useState(false);
 
   // 정렬
@@ -95,20 +126,94 @@ export default function CoupangPage() {
   const [costMap, setCostMap] = useState<Record<string, number>>({});
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  // 카테고리 목록
-  const { data: categoriesData } = useQuery<{ categories: string[] }>({
-    queryKey: ['coupang-categories'],
-    queryFn: () => fetch('/api/coupang/categories').then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
+  // localStorage 복원 완료 플래그 (복원 전 저장 방지)
+  const restoredRef = useRef(false);
+
+  // ---- 마운트 시 상태 복원 ----
+  useEffect(() => {
+    const s = getScopedJSON<Partial<PersistState> | null>(STATE_KEY, null);
+    if (s) {
+      if (s.searchInput != null) setSearchInput(s.searchInput);
+      if (s.keyword != null) setKeyword(s.keyword);
+      if (Array.isArray(s.cat) && s.cat.length === 4) setCat(s.cat as [string, string, string, string]);
+      if (s.onlyCat != null) setOnlyCat(s.onlyCat);
+      if (Array.isArray(s.excludedCats)) setExcludedCats(s.excludedCats);
+      if (s.minViews != null) setMinViews(s.minViews);
+      if (s.maxReviews != null) setMaxReviews(s.maxReviews);
+      if (typeof s.excludeBrands === 'boolean') setExcludeBrands(s.excludeBrands);
+      if (s.minPrice != null) setMinPrice(s.minPrice);
+      if (s.maxPrice != null) setMaxPrice(s.maxPrice);
+      if (s.minSales != null) setMinSales(s.minSales);
+      if (s.sortKey) setSortKey(s.sortKey);
+      if (typeof s.sortAsc === 'boolean') setSortAsc(s.sortAsc);
+      if (s.deliveryType) setDeliveryType(s.deliveryType);
+      if (s.rocketSize) setRocketSize(s.rocketSize);
+    }
+    setFavs(new Set(getScopedJSON<string[]>(FAVS_KEY, [])));
+    restoredRef.current = true;
+  }, []);
+
+  // ---- 상태 변경 시 저장 ----
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    const s: PersistState = {
+      searchInput, keyword, cat, onlyCat, excludedCats,
+      minViews, maxReviews, excludeBrands, minPrice, maxPrice, minSales,
+      sortKey, sortAsc, deliveryType, rocketSize,
+    };
+    setScopedJSON(STATE_KEY, s);
+  }, [searchInput, keyword, cat, onlyCat, excludedCats, minViews, maxReviews,
+      excludeBrands, minPrice, maxPrice, minSales, sortKey, sortAsc, deliveryType, rocketSize]);
+
+  // ---- 카테고리 트리 ----
+  const { data: treeData } = useQuery<{ tree: CatNode[] }>({
+    queryKey: ['coupang-category-tree'],
+    queryFn: () => fetch('/api/coupang/category-tree').then((r) => r.json()),
+    staleTime: 10 * 60 * 1000,
   });
+
+  const byPath = useMemo(() => {
+    const m = new Map<string, CatNode>();
+    const walk = (nodes: CatNode[]) => {
+      for (const n of nodes) {
+        m.set(n.path, n);
+        if (n.children?.length) walk(n.children);
+      }
+    };
+    walk(treeData?.tree || []);
+    return m;
+  }, [treeData]);
+
+  const catOptions = useMemo(() => {
+    const lvl1 = treeData?.tree || [];
+    const lvl2 = cat[0] ? byPath.get(cat[0])?.children || [] : [];
+    const lvl3 = cat[1] ? byPath.get(cat[1])?.children || [] : [];
+    const lvl4 = cat[2] ? byPath.get(cat[2])?.children || [] : [];
+    return [lvl1, lvl2, lvl3, lvl4];
+  }, [treeData, byPath, cat]);
+
+  // 선택된 최심 카테고리 path (만보기가 우선)
+  const categoryPath = onlyCat || cat[3] || cat[2] || cat[1] || cat[0] || '';
+
+  const handleCatChange = useCallback((level: number, value: string) => {
+    setCat((prev) => {
+      const next: [string, string, string, string] = [...prev];
+      next[level] = value;
+      for (let i = level + 1; i < 4; i++) next[i] = '';
+      return next;
+    });
+    setOnlyCat('');
+    setPage(1);
+  }, []);
 
   // 상품 목록
   const { data, isLoading, isFetching } = useQuery<PaginatedResponse<CoupangProduct>>({
-    queryKey: ['coupang-products', keyword, category, minViews, maxReviews, excludeBrands, minPrice, maxPrice, minSales, sortKey, sortAsc, page],
+    queryKey: ['coupang-products', keyword, categoryPath, excludedCats, onlyCat, minViews, maxReviews, excludeBrands, minPrice, maxPrice, minSales, sortKey, sortAsc, page],
     queryFn: () => {
       const params = new URLSearchParams();
       if (keyword) params.set('keyword', keyword);
-      if (category) params.set('category', category);
+      if (categoryPath) params.set('category_path', categoryPath);
+      if (!onlyCat && excludedCats.length) params.set('exclude_cats', excludedCats.join(','));
       if (minViews) params.set('min_views', minViews);
       if (maxReviews) params.set('max_reviews', maxReviews);
       if (minPrice) params.set('min_price', minPrice);
@@ -140,14 +245,16 @@ export default function CoupangPage() {
   }, [searchInput]);
 
   const handleSort = useCallback((key: CoupangSortKey) => {
-    if (sortKey === key) {
-      setSortAsc((prev) => !prev);
-    } else {
-      setSortKey(key);
+    setSortKey((prevKey) => {
+      if (prevKey === key) {
+        setSortAsc((prev) => !prev);
+        return prevKey;
+      }
       setSortAsc(false);
-    }
+      return key;
+    });
     setPage(1);
-  }, [sortKey]);
+  }, []);
 
   const handleCostChange = useCallback((productId: string, value: string) => {
     const cost = parseInt(value) || 0;
@@ -168,20 +275,48 @@ export default function CoupangPage() {
     setFavs((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
-      localStorage.setItem('coupang-favs', JSON.stringify([...next]));
+      setScopedJSON(FAVS_KEY, [...next]);
       return next;
     });
+  }, []);
+
+  // 카테고리 제외 / 만보기
+  const addExclude = useCallback((name: string) => {
+    if (!name) return;
+    setExcludedCats((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    setPage(1);
+  }, []);
+  const removeExclude = useCallback((name: string) => {
+    setExcludedCats((prev) => prev.filter((c) => c !== name));
+    setPage(1);
+  }, []);
+  const clearExcludes = useCallback(() => { setExcludedCats([]); setPage(1); }, []);
+  const setViewOnly = useCallback((path: string) => {
+    setOnlyCat(path);
+    setCat(['', '', '', '']);
+    setPage(1);
+  }, []);
+  const clearViewOnly = useCallback(() => { setOnlyCat(''); setPage(1); }, []);
+
+  const resetFilters = useCallback(() => {
+    setSearchInput(''); setKeyword('');
+    setCat(['', '', '', '']); setOnlyCat(''); setExcludedCats([]);
+    setMinViews(''); setMaxReviews(''); setMinPrice(''); setMaxPrice(''); setMinSales('');
+    setExcludeBrands(true); setFavOnly(false);
+    setPage(1);
   }, []);
 
   const shipFee = getShipFee(deliveryType, rocketSize);
   const products = data?.data || [];
   const displayProducts = favOnly ? products.filter((p) => favs.has(p.id)) : products;
 
+  const catLabels = ['1차', '2차', '3차', '4차'];
+
   return (
     <div className="max-w-full px-4 py-6 md:px-6">
       {/* 헤더 */}
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-text-primary">쿠팡 분석</h1>
+        <h1 className="text-xl font-bold text-text-primary">쿠팡 소싱 분석기</h1>
         <p className="text-sm text-text-secondary mt-1">
           쿠팡에서 잘 팔리는 상품을 찾고, 1688에서 소싱하세요
           {data?.total ? ` · 총 ${fmtNum(data.total)}개` : ''}
@@ -204,21 +339,29 @@ export default function CoupangPage() {
             />
           </div>
           <Button onClick={handleSearch} size="sm">검색</Button>
+          <Button onClick={resetFilters} size="sm" variant="secondary">초기화</Button>
+        </div>
+
+        {/* 캐스케이드 카테고리 */}
+        <div className="flex flex-wrap gap-2 items-center text-sm">
+          {[0, 1, 2, 3].map((lvl) => (
+            <select
+              key={lvl}
+              value={cat[lvl]}
+              onChange={(e) => handleCatChange(lvl, e.target.value)}
+              disabled={lvl > 0 && !cat[lvl - 1]}
+              className="px-3 py-1.5 border border-border-light rounded-[var(--radius-md)] text-sm bg-white disabled:opacity-40"
+            >
+              <option value="">{catLabels[lvl]} 전체</option>
+              {catOptions[lvl].map((n) => (
+                <option key={n.path} value={n.path}>{n.name}</option>
+              ))}
+            </select>
+          ))}
         </div>
 
         {/* 필터 옵션 — 행 1 */}
         <div className="flex flex-wrap gap-2 items-center text-sm">
-          <select
-            value={category}
-            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-            className="px-3 py-1.5 border border-border-light rounded-[var(--radius-md)] text-sm bg-white"
-          >
-            <option value="">전체 카테고리</option>
-            {(categoriesData?.categories || []).map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-
           <input
             type="number"
             value={minViews}
@@ -322,6 +465,34 @@ export default function CoupangPage() {
             배송비: {formatPrice(shipFee)}
           </span>
         </div>
+
+        {/* 제외/만보기 칩 */}
+        {(onlyCat || excludedCats.length > 0) && (
+          <div className="flex flex-wrap gap-1.5 items-center text-xs border-t border-border-light pt-3">
+            {onlyCat && (
+              <button
+                onClick={clearViewOnly}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary text-white"
+              >
+                {onlyCat.split('>').slice(-1)[0]} 만 보기 <X className="w-3 h-3" />
+              </button>
+            )}
+            {!onlyCat && excludedCats.map((name) => (
+              <button
+                key={name}
+                onClick={() => removeExclude(name)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-500 border border-red-200"
+              >
+                {name} 제외 <X className="w-3 h-3" />
+              </button>
+            ))}
+            {!onlyCat && excludedCats.length > 1 && (
+              <button onClick={clearExcludes} className="px-2 py-1 text-text-tertiary hover:text-red-500">
+                전체 해제
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 테이블 */}
@@ -331,7 +502,18 @@ export default function CoupangPage() {
             <tr className="bg-surface border-b border-border-light">
               <th className="px-2 py-2.5 text-center font-medium text-text-tertiary w-8">★</th>
               <th className="px-3 py-2.5 text-left font-medium text-text-tertiary w-12">#</th>
-              <th className="px-3 py-2.5 text-left font-medium text-text-tertiary min-w-[200px]">상품</th>
+              <th
+                className="px-3 py-2.5 text-left font-medium text-text-tertiary min-w-[200px] cursor-pointer hover:text-primary"
+                onClick={() => handleSort('product_name')}
+              >
+                <span className="inline-flex items-center gap-0.5">
+                  상품
+                  {sortKey === 'product_name' ? (
+                    sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </span>
+              </th>
+              <th className="px-3 py-2.5 text-left font-medium text-text-tertiary">주요키워드</th>
               <th className="px-3 py-2.5 text-left font-medium text-text-tertiary">카테고리</th>
               {SORT_OPTIONS.map((opt) => (
                 <th
@@ -349,7 +531,6 @@ export default function CoupangPage() {
                   </span>
                 </th>
               ))}
-              <th className="px-3 py-2.5 text-right font-medium text-text-tertiary whitespace-nowrap">전환율</th>
               <th className="px-3 py-2.5 text-right font-medium text-text-tertiary whitespace-nowrap">수수료%</th>
               <th className="px-3 py-2.5 text-center font-medium text-text-tertiary whitespace-nowrap w-24">원가 입력</th>
               <th className="px-3 py-2.5 text-right font-medium text-text-tertiary whitespace-nowrap">수익</th>
@@ -362,15 +543,15 @@ export default function CoupangPage() {
             {isLoading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <tr key={i} className="border-b border-border-light">
-                  <td colSpan={15} className="px-3 py-3">
+                  <td colSpan={18} className="px-3 py-3">
                     <Skeleton className="h-8 w-full" />
                   </td>
                 </tr>
               ))
             ) : displayProducts.length === 0 ? (
               <tr>
-                <td colSpan={15} className="px-3 py-12 text-center text-text-tertiary">
-                  {favOnly ? '즐겨찾기한 상품이 없습니다' : '검색 결과가 없습니다'}
+                <td colSpan={18} className="px-3 py-12 text-center text-text-tertiary">
+                  {favOnly ? '즐겨찾기한 상품이 없습니다' : '조건에 맞는 상품이 없습니다'}
                 </td>
               </tr>
             ) : (
@@ -380,6 +561,10 @@ export default function CoupangPage() {
                 const profit = importCost > 0 ? calcProfit(p.price, importCost, commRate, shipFee) : null;
                 const margin = profit != null ? calcMargin(profit, p.price) : null;
                 const roas = margin != null && margin > 0 ? calcROAS(margin) : null;
+                const conv = convMeta(p.conversion_source);
+                const excludeName = p.category_l2 || p.category_l1;
+                const onlyPath = p.category_l2 ? `${p.category_l1}>${p.category_l2}` : p.category_l1;
+                const keywords = [p.main_keyword, p.sub_keyword1, p.sub_keyword2].filter(Boolean) as string[];
 
                 return (
                   <tr key={p.id} className="border-b border-border-light hover:bg-surface/50 transition-colors">
@@ -416,20 +601,63 @@ export default function CoupangPage() {
                           >
                             {p.product_name}
                           </a>
-                          {p.main_keyword && (
-                            <p className="text-[10px] text-text-tertiary mt-0.5 truncate">{p.main_keyword}</p>
+                          {p.item_name && (
+                            <p className="text-[10px] text-text-tertiary mt-0.5 truncate">{p.item_name}</p>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs text-text-secondary whitespace-nowrap">{p.category_l1}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1 max-w-[180px]">
+                        {keywords.map((kw, i) => (
+                          <a
+                            key={i}
+                            href={`${COUPANG_SEARCH}${encodeURIComponent(kw)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(
+                              'px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap transition-colors',
+                              i === 0
+                                ? 'bg-primary-5 text-primary hover:bg-primary hover:text-white'
+                                : 'bg-surface text-text-secondary hover:bg-border-light'
+                            )}
+                          >
+                            {kw}
+                          </a>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-text-secondary whitespace-nowrap">
+                      <span>{[p.category_l1, p.category_l2].filter(Boolean).join(' > ')}</span>
+                      <span className="ml-1 inline-flex gap-1">
+                        <button
+                          onClick={() => addExclude(excludeName)}
+                          className="text-[10px] text-red-400 hover:text-red-600"
+                          title={`${excludeName} 제외`}
+                        >
+                          (제외)
+                        </button>
+                        <button
+                          onClick={() => setViewOnly(onlyPath)}
+                          className="text-[10px] text-primary hover:underline"
+                          title={`${excludeName}만 보기`}
+                        >
+                          (만보기)
+                        </button>
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right text-xs tabular-nums">{fmtNum(p.view_count)}</td>
                     <td className="px-3 py-2 text-right text-xs tabular-nums">{fmtNum(p.buy_count)}</td>
-                    <td className="px-3 py-2 text-right text-xs tabular-nums">{fmtNum(p.estimated_monthly_sales)}</td>
-                    <td className="px-3 py-2 text-right text-xs tabular-nums">{fmtNum(p.estimated_monthly_revenue)}</td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums">
+                      {fmtNum(p.estimated_monthly_sales)}
+                      {p.buy_count ? <span className="text-[9px] text-green-600 ml-0.5">(실)</span> : null}
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums text-blue-600">{fmtNum(p.estimated_monthly_revenue)}</td>
                     <td className="px-3 py-2 text-right text-xs tabular-nums">{formatPrice(p.price)}</td>
                     <td className="px-3 py-2 text-right text-xs tabular-nums">{fmtNum(p.review_count)}</td>
-                    <td className="px-3 py-2 text-right text-xs tabular-nums">{fmtPercent(p.conversion_rate)}</td>
+                    <td className={cn('px-3 py-2 text-right text-xs tabular-nums', conv.cls)} title={conv.title}>
+                      {fmtPercent(p.conversion_rate)}
+                    </td>
                     <td className="px-3 py-2 text-right text-xs tabular-nums">{commRate}%</td>
                     <td className="px-3 py-2">
                       <input

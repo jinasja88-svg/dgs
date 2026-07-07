@@ -9,13 +9,25 @@ const SORT_COLUMNS: Record<CoupangSortKey, string> = {
   price: 'price',
   review_count: 'review_count',
   buy_count: 'buy_count',
+  conversion_rate: 'conversion_rate',
+  product_name: 'product_name',
 };
+
+// PostgREST like/ilike 패턴에서 특수문자 이스케이프 (%, _, \)
+function escapeLike(s: string): string {
+  return s.replace(/([\\%_])/g, '\\$1');
+}
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
 
   const keyword = sp.get('keyword')?.trim() || '';
   const category = sp.get('category') || '';
+  const categoryPath = sp.get('category_path')?.trim() || '';
+  const excludeCats = (sp.get('exclude_cats') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const minPrice = parseInt(sp.get('min_price') || '0') || 0;
   const maxPrice = parseInt(sp.get('max_price') || '0') || 0;
   const minViews = parseInt(sp.get('min_views') || '0') || 0;
@@ -41,9 +53,21 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 카테고리 필터
-  if (category) {
+  // 카테고리 필터 — 전체 경로 prefix 매칭 (캐스케이드 셀렉터). category_path 우선.
+  if (categoryPath) {
+    query = query.ilike('category', `${escapeLike(categoryPath)}%`);
+  } else if (category) {
+    // 하위호환: 대분류(category_l1) 정확 일치
     query = query.eq('category_l1', category);
+  }
+
+  // 카테고리 제외 (대분류/중분류 기준). category_l2 는 null 가능 →
+  // NOT IN 의 null 함정을 피하려 "is null OR not in" 으로 처리.
+  if (excludeCats.length > 0) {
+    const quoted = excludeCats.map((c) => `"${c.replace(/"/g, '')}"`).join(',');
+    query = query
+      .not('category_l1', 'in', `(${quoted})`)
+      .or(`category_l2.is.null,category_l2.not.in.(${quoted})`);
   }
 
   // 가격 필터
