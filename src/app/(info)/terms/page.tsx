@@ -26,7 +26,7 @@ export default function TermsPage() {
           <p>본 약관에서 사용하는 용어의 정의는 다음과 같습니다.</p>
           <ol className="list-decimal pl-5 space-y-2 mt-2">
             <li>
-              <strong>&quot;서비스&quot;</strong>란 회사가 딸깍소싱 웹사이트(ddalkkak.com) 및 관련 애플리케이션을 통해 제공하는 중국 1688 플랫폼 상품 검색, 구매대행, 결제, 국제배송 등 일체의 서비스를 말합니다.
+              <strong>&quot;서비스&quot;</strong>란 회사가 딸깍소싱 웹사이트(ddkksc.com) 및 관련 애플리케이션을 통해 제공하는 중국 1688 플랫폼 상품 검색, 구매대행, 결제, 국제배송 등 일체의 서비스를 말합니다.
             </li>
             <li>
               <strong>&quot;이용자&quot;</strong>란 본 약관에 따라 회사가 제공하는 서비스를 이용하는 회원 및 비회원을 말합니다.
@@ -413,10 +413,11 @@ export default function TermsPage() {
         {/* 사업자 정보 */}
         <section className="border-t border-border pt-6 text-xs text-text-tertiary space-y-1">
           <p><strong>상호명:</strong> 주식회사네이처발란스</p>
+          <p><strong>대표자:</strong> 신진아</p>
           <p><strong>사업자 등록번호:</strong> 792-81-03202</p>
           <p><strong>통신판매업 신고번호:</strong> 2024-전남나주-0193</p>
           <p><strong>개인정보보호책임자:</strong> 신진아</p>
-          <p><strong>주소:</strong> 58217 전라남도 나주시 상야4길 16-10 (빛가람동) 310호</p>
+          <p><strong>주소:</strong> 58326 전라남도 나주시 교육길 13, 제이에이동 2층 210호 (빛가람동, 스마트파크 지식산업센터)</p>
         </section>
 
       </div>
