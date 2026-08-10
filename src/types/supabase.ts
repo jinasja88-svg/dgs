@@ -569,6 +569,48 @@ export type Database = {
         }
         Relationships: []
       }
+      shipping_addresses: {
+        Row: {
+          address: string
+          address_detail: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          label: string
+          phone: string
+          postal_code: string | null
+          recipient: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          address_detail?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label: string
+          phone: string
+          postal_code?: string | null
+          recipient: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          address_detail?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          phone?: string
+          postal_code?: string | null
+          recipient?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category_id: string | null

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import * as PortOne from '@portone/browser-sdk/v2';
 import { ArrowLeft, Building2, CreditCard, MapPin, Search, ShieldCheck, Wallet } from 'lucide-react';
-import { getCart, clearCart } from '@/lib/cart';
+import { clearBuyNow, clearCart, getBuyNowItems, getCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/utils';
 import { createClient } from '@/lib/supabase';
 import {
@@ -29,6 +29,17 @@ interface SavedAddress {
   is_default: boolean;
 }
 
+type CheckoutSource = 'cart' | 'buy-now';
+
+const EMPTY_MANUAL_ADDRESS = {
+  label: '기본 배송지',
+  name: '',
+  phone: '',
+  postal_code: '',
+  address: '',
+  detail_address: '',
+};
+
 const EMPTY_BUSINESS: BusinessInfo = {
   company_name: '',
   registration_number: '',
@@ -41,9 +52,12 @@ const EMPTY_BUSINESS: BusinessInfo = {
 export default function CheckoutPage() {
   const router = useRouter();
   const [items, setItems] = useState<SourcingCartItem[]>([]);
+  const [checkoutSource, setCheckoutSource] = useState<CheckoutSource>('cart');
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>('manual');
-  const [manual, setManual] = useState({ name: '', phone: '', postal_code: '', address: '', detail_address: '' });
+  const [manual, setManual] = useState(EMPTY_MANUAL_ADDRESS);
+  const [saveManualAddress, setSaveManualAddress] = useState(true);
+  const [addressLoadError, setAddressLoadError] = useState('');
   const [business, setBusiness] = useState<BusinessInfo>(EMPTY_BUSINESS);
   const [agree, setAgree] = useState({ terms: false, privacy: false, coupang: false });
   const [payMethod, setPayMethod] = useState<'CARD' | 'EASY_PAY'>('CARD');
@@ -58,37 +72,72 @@ export default function CheckoutPage() {
   } | null>(null);
 
   useEffect(() => {
-    setItems(getCart());
+    const checkoutMode = new URLSearchParams(window.location.search).get('mode');
+    const buyNowItems = checkoutMode === 'buy-now' ? getBuyNowItems() : [];
+    if (buyNowItems.length > 0) {
+      setItems(buyNowItems);
+      setCheckoutSource('buy-now');
+    } else {
+      setItems(getCart());
+      setCheckoutSource('cart');
+    }
+
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) {
         router.replace('/login?redirect=/checkout');
         return;
       }
       setUserEmail(data.user.email || '');
-      // 지난 주문에서 저장된 사업자 정보 자동 입력
-      supabase
-        .from('profiles')
-        .select('business_info')
-        .eq('id', data.user.id)
-        .single()
-        .then(({ data: profile }) => {
-          const saved = profile?.business_info as Partial<BusinessInfo> | null;
-          if (saved && saved.company_name) {
-            setBusiness({ ...EMPTY_BUSINESS, ...saved });
-          }
-        });
-      fetch('/api/addresses')
-        .then((r) => (r.ok ? r.json() : []))
-        .then((list: SavedAddress[]) => {
-          if (Array.isArray(list) && list.length) {
-            setAddresses(list);
-            const def = list.find((a) => a.is_default) || list[0];
-            setSelectedAddressId(def.id);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoaded(true));
+
+      const metadataName =
+        data.user.user_metadata?.full_name ||
+        data.user.user_metadata?.name ||
+        '';
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, phone, business_info')
+          .eq('id', data.user.id)
+          .single();
+
+        setManual((prev) => ({
+          ...prev,
+          name: prev.name || profile?.name || metadataName,
+          phone: prev.phone || profile?.phone || '',
+        }));
+
+        const saved = profile?.business_info as Partial<BusinessInfo> | null;
+        if (saved && saved.company_name) {
+          setBusiness({ ...EMPTY_BUSINESS, ...saved });
+        }
+      } catch {
+        if (metadataName) {
+          setManual((prev) => ({ ...prev, name: prev.name || metadataName }));
+        }
+      }
+
+      try {
+        const res = await fetch('/api/addresses');
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.error || '배송지를 불러오지 못했습니다.');
+        }
+        const list: SavedAddress[] = await res.json();
+        if (Array.isArray(list) && list.length) {
+          setAddresses(list);
+          setSaveManualAddress(false);
+          const def = list.find((a) => a.is_default) || list[0];
+          setSelectedAddressId(def.id);
+        } else {
+          setSaveManualAddress(true);
+        }
+      } catch (error) {
+        setAddressLoadError(error instanceof Error ? error.message : '배송지를 불러오지 못했습니다.');
+      } finally {
+        setLoaded(true);
+      }
     });
   }, [router]);
 
@@ -99,19 +148,19 @@ export default function CheckoutPage() {
     const sel = addresses.find((a) => a.id === selectedAddressId);
     if (sel) {
       return {
-        name: sel.recipient,
-        phone: sel.phone,
-        address: sel.address,
-        detail_address: sel.address_detail || '',
-        postal_code: sel.postal_code || '',
+        name: sel.recipient.trim(),
+        phone: sel.phone.trim(),
+        address: sel.address.trim(),
+        detail_address: (sel.address_detail || '').trim(),
+        postal_code: (sel.postal_code || '').trim(),
       };
     }
     return {
-      name: manual.name,
-      phone: manual.phone,
-      address: manual.address,
-      detail_address: manual.detail_address,
-      postal_code: manual.postal_code,
+      name: manual.name.trim(),
+      phone: manual.phone.trim(),
+      address: manual.address.trim(),
+      detail_address: manual.detail_address.trim(),
+      postal_code: manual.postal_code.trim(),
     };
   }, [addresses, selectedAddressId, manual]);
 
@@ -199,6 +248,10 @@ export default function CheckoutPage() {
             total_cny: subtotalCny,
             total_krw: subtotal,
             shipping_address: shippingAddress,
+            save_shipping_address:
+              !addresses.some((a) => a.id === selectedAddressId) && saveManualAddress,
+            shipping_address_label:
+              manual.label.trim() || (addresses.length ? '새 배송지' : '기본 배송지'),
             business_info: business,
             terms_agreed: agree,
           }),
@@ -263,7 +316,11 @@ export default function CheckoutPage() {
         return;
       }
 
-      clearCart();
+      if (checkoutSource === 'buy-now') {
+        clearBuyNow();
+      } else {
+        clearCart();
+      }
       router.push(`/checkout/success?orderId=${order.order_number}&confirmed=1`);
     } catch (e) {
       // 실제 원인(포트원 SDK 등)을 화면·콘솔에 노출해 진단 가능하게
@@ -290,7 +347,7 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/cart" className="text-muted hover:text-ink transition-colors">
+        <Link href={checkoutSource === 'buy-now' ? '/shop' : '/cart'} className="text-muted hover:text-ink transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-xl font-bold text-ink">주문/결제</h1>
@@ -303,6 +360,11 @@ export default function CheckoutPage() {
             <h2 className="flex items-center gap-2 text-sm font-semibold mb-4">
               <MapPin className="w-4 h-4 text-primary" /> 배송지
             </h2>
+            {addressLoadError && (
+              <div className="mb-4 rounded-[var(--radius-sm)] border border-warning/30 bg-warning-5 px-3 py-2 text-xs text-warning">
+                저장된 배송지를 불러오지 못했습니다. 새 배송지를 입력하면 주문은 계속 진행됩니다.
+              </div>
+            )}
             {addresses.length > 0 && (
               <div className="space-y-2 mb-4">
                 {addresses.map((a) => (
@@ -341,6 +403,10 @@ export default function CheckoutPage() {
 
             {!addresses.some((a) => a.id === selectedAddressId) && (
               <div className="grid sm:grid-cols-2 gap-3">
+                {saveManualAddress && (
+                  <input className={inputCls} placeholder="배송지 이름 (예: 회사)" value={manual.label} onChange={(e) => setManual({ ...manual, label: e.target.value })} />
+                )}
+                {saveManualAddress && <div className="hidden sm:block" />}
                 <input className={inputCls} placeholder="받는 분" value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} />
                 <input className={inputCls} placeholder="연락처 (010-0000-0000)" value={manual.phone} onChange={(e) => setManual({ ...manual, phone: e.target.value })} />
                 <div className="sm:col-span-2 flex gap-2">
@@ -373,6 +439,15 @@ export default function CheckoutPage() {
                   value={manual.detail_address}
                   onChange={(e) => setManual({ ...manual, detail_address: e.target.value })}
                 />
+                <label className="sm:col-span-2 flex items-center gap-2.5 text-sm text-ink cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveManualAddress}
+                    onChange={(e) => setSaveManualAddress(e.target.checked)}
+                    className="accent-[var(--color-primary)]"
+                  />
+                  <span>이 배송지를 기본 배송지로 저장</span>
+                </label>
               </div>
             )}
           </section>

@@ -5,6 +5,11 @@ import { updateSession } from '@/lib/supabase-middleware';
 const protectedRoutes = ['/mypage', '/checkout', '/sourcing-orders'];
 const authRoutes = ['/login', '/signup', '/reset-password'];
 
+function getSafeRedirectTarget(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/mypage';
+  return value;
+}
+
 export async function proxy(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
@@ -12,9 +17,8 @@ export async function proxy(request: NextRequest) {
   // Protected routes - redirect to login if not authenticated
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      url.searchParams.set('redirect', pathname);
+      const url = new URL('/login', request.url);
+      url.searchParams.set('redirect', `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(url);
     }
   }
@@ -42,7 +46,7 @@ export async function proxy(request: NextRequest) {
   // Auth routes - redirect to mypage if already authenticated
   if (authRoutes.some((route) => pathname.startsWith(route))) {
     if (user) {
-      return NextResponse.redirect(new URL('/mypage', request.url));
+      return NextResponse.redirect(new URL(getSafeRedirectTarget(request.nextUrl.searchParams.get('redirect')), request.url));
     }
   }
 

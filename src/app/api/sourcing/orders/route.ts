@@ -4,6 +4,10 @@ import { generateOrderNumber } from '@/lib/utils';
 import { getDomesticShippingFee } from '@/lib/shipping';
 import type { BusinessInfo } from '@/types';
 
+function clean(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export async function GET() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -40,12 +44,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { items, total_cny, total_krw, service_fee, shipping_address, business_info, terms_agreed } = body as {
+  const {
+    items,
+    total_cny,
+    total_krw,
+    service_fee,
+    shipping_address,
+    save_shipping_address,
+    shipping_address_label,
+    business_info,
+    terms_agreed,
+  } = body as {
     items: Array<{ product_id: string; title: string; image: string; sku_name?: string; quantity: number; price_cny: number; price_krw: number }>;
     total_cny: number;
     total_krw: number;
     service_fee: number;
-    shipping_address: { name?: string; phone?: string; address?: string; detail_address?: string; postal_code?: string } | null;
+    shipping_address: {
+      name?: string;
+      recipient?: string;
+      phone?: string;
+      address?: string;
+      detail_address?: string;
+      address_detail?: string;
+      postal_code?: string;
+    } | null;
+    save_shipping_address?: boolean;
+    shipping_address_label?: string;
     business_info: Partial<BusinessInfo> | null;
     terms_agreed: { terms?: boolean; privacy?: boolean; coupang?: boolean } | null;
   };
@@ -68,20 +92,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '총 금액이 올바르지 않습니다.' }, { status: 400 });
   }
 
+  const normalizedShippingAddress = {
+    name: clean(shipping_address?.name) || clean(shipping_address?.recipient),
+    phone: clean(shipping_address?.phone),
+    address: clean(shipping_address?.address),
+    detail_address: clean(shipping_address?.detail_address) || clean(shipping_address?.address_detail),
+    postal_code: clean(shipping_address?.postal_code),
+  };
+
   // 배송지 검증 (필수)
-  if (!shipping_address || !shipping_address.name || !shipping_address.phone || !shipping_address.address) {
+  if (!normalizedShippingAddress.name || !normalizedShippingAddress.phone || !normalizedShippingAddress.address) {
     return NextResponse.json({ error: '배송지 정보를 입력해주세요.' }, { status: 400 });
   }
 
   // 사업자정보 검증 (B2B 필수)
-  const regDigits = (business_info?.registration_number || '').replace(/\D/g, '');
+  const normalizedBusinessInfo: BusinessInfo = {
+    company_name: clean(business_info?.company_name),
+    registration_number: clean(business_info?.registration_number).replace(/\D/g, ''),
+    representative: clean(business_info?.representative),
+    business_type: clean(business_info?.business_type),
+    business_item: clean(business_info?.business_item),
+    address: clean(business_info?.address),
+  };
+  const regDigits = normalizedBusinessInfo.registration_number;
   if (
     !business_info ||
-    !business_info.company_name ||
-    !business_info.representative ||
-    !business_info.business_type ||
-    !business_info.business_item ||
-    !business_info.address ||
+    !normalizedBusinessInfo.company_name ||
+    !normalizedBusinessInfo.representative ||
+    !normalizedBusinessInfo.business_type ||
+    !normalizedBusinessInfo.business_item ||
+    !normalizedBusinessInfo.address ||
     regDigits.length !== 10
   ) {
     return NextResponse.json({ error: '사업자 정보를 모두 정확히 입력해주세요. (사업자등록번호 10자리)' }, { status: 400 });
@@ -93,15 +133,15 @@ export async function POST(request: NextRequest) {
   }
 
   // 배송비는 서버에서 배송지 기반으로 재계산 (클라이언트 값 신뢰하지 않음)
-  const shipping_fee = getDomesticShippingFee(shipping_address);
+  const shipping_fee = getDomesticShippingFee(normalizedShippingAddress);
 
-  const normalizedBusinessInfo: BusinessInfo = {
-    company_name: business_info.company_name,
+  const savedBusinessInfo: BusinessInfo = {
+    company_name: normalizedBusinessInfo.company_name,
     registration_number: regDigits.replace(/(\d{3})(\d{2})(\d{5})/, '$1-$2-$3'),
-    representative: business_info.representative,
-    business_type: business_info.business_type,
-    business_item: business_info.business_item,
-    address: business_info.address,
+    representative: normalizedBusinessInfo.representative,
+    business_type: normalizedBusinessInfo.business_type,
+    business_item: normalizedBusinessInfo.business_item,
+    address: normalizedBusinessInfo.address,
   };
 
   // 최근 10초 내 동일 사용자의 주문이 있는지 확인 (중복 방지)
@@ -127,8 +167,8 @@ export async function POST(request: NextRequest) {
       total_krw,
       service_fee: service_fee || 0,
       shipping_fee,
-      shipping_address,
-      business_info: normalizedBusinessInfo,
+      shipping_address: normalizedShippingAddress,
+      business_info: savedBusinessInfo,
       terms_agreed: {
         terms: true,
         privacy: true,
@@ -148,35 +188,37 @@ export async function POST(request: NextRequest) {
     // 1) 사업자 정보 → 프로필에 저장 (체크아웃 프리필용)
     await supabase
       .from('profiles')
-      .update({ business_info: normalizedBusinessInfo })
+      .update({ business_info: savedBusinessInfo })
       .eq('id', user.id);
 
     // 2) 직접 입력한 배송지면 저장 목록에 자동 추가 (중복 제외)
-    const { data: existing } = await supabase
-      .from('shipping_addresses')
-      .select('id, recipient, phone, address, address_detail')
-      .eq('user_id', user.id);
+    if (save_shipping_address !== false) {
+      const { data: existing } = await supabase
+        .from('shipping_addresses')
+        .select('id, recipient, phone, address, address_detail')
+        .eq('user_id', user.id);
 
-    const norm = (s?: string | null) => (s || '').replace(/\s+/g, ' ').trim();
-    const isDuplicate = (existing ?? []).some(
-      (a) =>
-        norm(a.recipient) === norm(shipping_address.name) &&
-        norm(a.phone) === norm(shipping_address.phone) &&
-        norm(a.address) === norm(shipping_address.address) &&
-        norm(a.address_detail) === norm(shipping_address.detail_address)
-    );
+      const norm = (s?: string | null) => (s || '').replace(/\s+/g, ' ').trim();
+      const isDuplicate = (existing ?? []).some(
+        (a) =>
+          norm(a.recipient) === norm(normalizedShippingAddress.name) &&
+          norm(a.phone) === norm(normalizedShippingAddress.phone) &&
+          norm(a.address) === norm(normalizedShippingAddress.address) &&
+          norm(a.address_detail) === norm(normalizedShippingAddress.detail_address)
+      );
 
-    if (!isDuplicate) {
-      await supabase.from('shipping_addresses').insert({
-        user_id: user.id,
-        label: '최근 배송지',
-        recipient: shipping_address.name,
-        phone: shipping_address.phone,
-        address: shipping_address.address,
-        address_detail: shipping_address.detail_address || null,
-        postal_code: shipping_address.postal_code || null,
-        is_default: (existing ?? []).length === 0, // 첫 배송지는 기본으로
-      });
+      if (!isDuplicate) {
+        await supabase.from('shipping_addresses').insert({
+          user_id: user.id,
+          label: clean(shipping_address_label) || '최근 배송지',
+          recipient: normalizedShippingAddress.name,
+          phone: normalizedShippingAddress.phone,
+          address: normalizedShippingAddress.address,
+          address_detail: normalizedShippingAddress.detail_address || null,
+          postal_code: normalizedShippingAddress.postal_code || null,
+          is_default: (existing ?? []).length === 0, // 첫 배송지는 기본으로
+        });
+      }
     }
   } catch {
     // 프리필 저장 실패는 무시

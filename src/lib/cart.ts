@@ -2,6 +2,7 @@ import type { SourcingCartItem } from '@/types';
 import { getScopedJSON, setScopedJSON, removeScoped } from './client-scope';
 
 const CART_KEY = 'ddalkkak-cart'; // 계정별 스코핑은 client-scope가 담당
+const BUY_NOW_KEY = 'ddalkkak-buy-now';
 const MAX_ITEMS = 50;
 
 export function getCart(): SourcingCartItem[] {
@@ -58,4 +59,23 @@ export function clearCart(): void {
 // 장바구니 항목(상품 종류) 개수 — 수량 합계가 아님
 export function getCartCount(): number {
   return getCart().length;
+}
+
+export function setBuyNowItem(item: SourcingCartItem): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(BUY_NOW_KEY, JSON.stringify([item]));
+}
+
+export function getBuyNowItems(): SourcingCartItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(sessionStorage.getItem(BUY_NOW_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function clearBuyNow(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(BUY_NOW_KEY);
 }

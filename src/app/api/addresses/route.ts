@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 
+function clean(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 // GET /api/addresses
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -24,7 +28,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: '로그인이 필요합니다' }, { status: 401 });
 
-  let body: {
+  let body: Partial<{
     label: string;
     recipient: string;
     phone: string;
@@ -32,19 +36,29 @@ export async function POST(request: NextRequest) {
     address_detail?: string;
     postal_code?: string;
     is_default?: boolean;
-  };
+  }>;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: '잘못된 요청입니다' }, { status: 400 });
   }
 
-  if (!body.label || !body.recipient || !body.phone || !body.address) {
+  const normalized = {
+    label: clean(body.label),
+    recipient: clean(body.recipient),
+    phone: clean(body.phone),
+    address: clean(body.address),
+    address_detail: clean(body.address_detail) || null,
+    postal_code: clean(body.postal_code) || null,
+    is_default: Boolean(body.is_default),
+  };
+
+  if (!normalized.label || !normalized.recipient || !normalized.phone || !normalized.address) {
     return NextResponse.json({ error: '필수 항목이 누락되었습니다' }, { status: 400 });
   }
 
   // 기본 배송지로 설정 시 기존 기본 배송지 해제
-  if (body.is_default) {
+  if (normalized.is_default) {
     await supabase
       .from('shipping_addresses')
       .update({ is_default: false })
@@ -61,13 +75,13 @@ export async function POST(request: NextRequest) {
     .from('shipping_addresses')
     .insert({
       user_id: user.id,
-      label: body.label,
-      recipient: body.recipient,
-      phone: body.phone,
-      address: body.address,
-      address_detail: body.address_detail || null,
-      postal_code: body.postal_code || null,
-      is_default: body.is_default || count === 0,
+      label: normalized.label,
+      recipient: normalized.recipient,
+      phone: normalized.phone,
+      address: normalized.address,
+      address_detail: normalized.address_detail,
+      postal_code: normalized.postal_code,
+      is_default: normalized.is_default || count === 0,
     })
     .select()
     .single();

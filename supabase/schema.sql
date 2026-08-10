@@ -27,6 +27,27 @@ CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.
 CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- ============================
+-- SHIPPING ADDRESSES
+-- ============================
+CREATE TABLE IF NOT EXISTS shipping_addresses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  label TEXT NOT NULL CHECK (length(btrim(label)) > 0),
+  recipient TEXT NOT NULL CHECK (length(btrim(recipient)) > 0),
+  phone TEXT NOT NULL CHECK (length(btrim(phone)) > 0),
+  postal_code TEXT,
+  address TEXT NOT NULL CHECK (length(btrim(address)) > 0),
+  address_detail TEXT,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE shipping_addresses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own shipping addresses" ON shipping_addresses
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- ============================
 -- CATEGORIES
 -- ============================
 CREATE TABLE IF NOT EXISTS categories (
@@ -280,6 +301,7 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXE
 CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_notices_updated_at BEFORE UPDATE ON notices FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER update_shipping_addresses_updated_at BEFORE UPDATE ON shipping_addresses FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================
 -- INDEXES
@@ -287,6 +309,8 @@ CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_published ON products(is_published);
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shipping_addresses_one_default ON shipping_addresses(user_id) WHERE is_default;
+CREATE INDEX IF NOT EXISTS idx_shipping_addresses_user ON shipping_addresses(user_id, is_default DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sourcing_orders_user ON sourcing_orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_sourcing_orders_status ON sourcing_orders(status);
 CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id);

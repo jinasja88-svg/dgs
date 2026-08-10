@@ -9,7 +9,7 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import { formatPrice, cn } from '@/lib/utils';
-import { addToCart } from '@/lib/cart';
+import { addToCart, setBuyNowItem } from '@/lib/cart';
 import { addRecentlyViewed } from '@/lib/recently-viewed';
 import { createClient } from '@/lib/supabase';
 import type { SourcingProduct } from '@/types';
@@ -227,47 +227,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
     setTimeout(() => setAddedToCart(false), 2000);
   };
 
-  const handleOrder = async () => {
+  const handleOrder = () => {
     if (displayProduct?.skus?.length && !selectedSku) {
       toast.error('옵션을 선택해주세요.');
       return;
     }
 
     setIsOrdering(true);
-    try {
-      const res = await fetch('/api/sourcing/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [
-            {
-              product_id: displayProduct!.product_id,
-              title: displayProduct!.title,
-              image: displayProduct!.images[0] || '',
-              sku_name: selectedSkuData?.name,
-              quantity,
-              price_cny: currentPriceCny,
-              price_krw: currentPrice,
-            },
-          ],
-          total_cny: currentPriceCny * quantity,
-          total_krw: currentPrice * quantity,
-          shipping_fee: shippingFee,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || '주문 실패');
-      }
-
-      toast.success('주문이 접수되었습니다!');
-      router.push('/sourcing-orders');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '주문 중 오류가 발생했습니다.');
-    } finally {
-      setIsOrdering(false);
-    }
+    setBuyNowItem({
+      product_id: displayProduct!.product_id,
+      title: displayProduct!.title,
+      image: displayProduct!.images[0] || '',
+      sku_id: selectedSkuData?.sku_id,
+      sku_name: selectedSkuData?.name,
+      quantity,
+      price_cny: currentPriceCny,
+      price_krw: currentPrice,
+      min_order: displayProduct!.min_order || 1,
+    });
+    router.push('/checkout?mode=buy-now');
   };
 
   if (!isLoading && !displayProduct) {
