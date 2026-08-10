@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -171,6 +171,9 @@ export default function CheckoutPage() {
   const setBiz = (key: keyof BusinessInfo, value: string) =>
     setBusiness((prev) => ({ ...prev, [key]: value }));
 
+  const setManualField = (key: keyof typeof EMPTY_MANUAL_ADDRESS, value: string) =>
+    setManual((prev) => ({ ...prev, [key]: value }));
+
   const handleAddressSearch = async () => {
     try {
       await openPostcodeSearch(({ zonecode, address }) => {
@@ -191,13 +194,47 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (items.length === 0) {
       toast.error('주문할 상품이 없습니다.');
       return;
     }
-    if (!shippingAddress.name || !shippingAddress.phone || !shippingAddress.address) {
-      toast.error('배송지 정보를 입력해주세요.');
+
+    const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
+    const formData = new FormData(event.currentTarget);
+    const formValue = (name: string, fallback: string) => {
+      const value = formData.get(name);
+      return (typeof value === 'string' ? value : fallback).trim();
+    };
+    // 브라우저 자동완성은 화면 값만 채우고 React 상태 변경 이벤트를 누락할 수 있어
+    // 직접 입력 배송지는 제출 시점의 실제 폼 값으로 확정한다.
+    const submittedShippingAddress = selectedAddress
+      ? {
+          name: selectedAddress.recipient.trim(),
+          phone: selectedAddress.phone.trim(),
+          address: selectedAddress.address.trim(),
+          detail_address: (selectedAddress.address_detail || '').trim(),
+          postal_code: (selectedAddress.postal_code || '').trim(),
+        }
+      : {
+          name: formValue('shipping_name', manual.name),
+          phone: formValue('shipping_phone', manual.phone),
+          address: formValue('shipping_address', manual.address),
+          detail_address: formValue('shipping_address_detail', manual.detail_address),
+          postal_code: formValue('shipping_postal_code', manual.postal_code),
+        };
+
+    const missingShippingField = [
+      { value: submittedShippingAddress.name, name: 'shipping_name', label: '받는 분' },
+      { value: submittedShippingAddress.phone, name: 'shipping_phone', label: '연락처' },
+      { value: submittedShippingAddress.address, name: 'shipping_address', label: '주소' },
+    ].find((field) => !field.value);
+    if (missingShippingField) {
+      toast.error(`배송지의 ${missingShippingField.label} 항목을 입력해주세요.`);
+      const field = event.currentTarget.elements.namedItem(missingShippingField.name);
+      if (field instanceof HTMLElement) field.focus();
       return;
     }
     const regDigits = business.registration_number.replace(/\D/g, '');
@@ -247,11 +284,12 @@ export default function CheckoutPage() {
             })),
             total_cny: subtotalCny,
             total_krw: subtotal,
-            shipping_address: shippingAddress,
+            shipping_address: submittedShippingAddress,
             save_shipping_address:
-              !addresses.some((a) => a.id === selectedAddressId) && saveManualAddress,
+              !selectedAddress && saveManualAddress,
             shipping_address_label:
-              manual.label.trim() || (addresses.length ? '새 배송지' : '기본 배송지'),
+              formValue('shipping_label', manual.label) ||
+              (addresses.length ? '새 배송지' : '기본 배송지'),
             business_info: business,
             terms_agreed: agree,
           }),
@@ -290,8 +328,8 @@ export default function CheckoutPage() {
         currency: 'CURRENCY_KRW',
         payMethod,
         customer: {
-          fullName: shippingAddress.name,
-          phoneNumber: shippingAddress.phone,
+          fullName: submittedShippingAddress.name,
+          phoneNumber: submittedShippingAddress.phone,
           email: userEmail, // 이니시스 V2 일반결제 필수
         },
         redirectUrl: `${window.location.origin}/checkout/success`,
@@ -353,7 +391,7 @@ export default function CheckoutPage() {
         <h1 className="text-xl font-bold text-ink">주문/결제</h1>
       </div>
 
-      <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+      <form onSubmit={handleSubmit} className="lg:grid lg:grid-cols-3 lg:gap-8">
         <div className="lg:col-span-2 space-y-6 mb-6 lg:mb-0">
           {/* 배송지 */}
           <section className="bg-canvas border border-hairline rounded-[var(--radius-md)] p-5">
@@ -404,14 +442,39 @@ export default function CheckoutPage() {
             {!addresses.some((a) => a.id === selectedAddressId) && (
               <div className="grid sm:grid-cols-2 gap-3">
                 {saveManualAddress && (
-                  <input className={inputCls} placeholder="배송지 이름 (예: 회사)" value={manual.label} onChange={(e) => setManual({ ...manual, label: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    name="shipping_label"
+                    autoComplete="off"
+                    placeholder="배송지 이름 (예: 회사)"
+                    value={manual.label}
+                    onChange={(e) => setManualField('label', e.target.value)}
+                  />
                 )}
                 {saveManualAddress && <div className="hidden sm:block" />}
-                <input className={inputCls} placeholder="받는 분" value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} />
-                <input className={inputCls} placeholder="연락처 (010-0000-0000)" value={manual.phone} onChange={(e) => setManual({ ...manual, phone: e.target.value })} />
+                <input
+                  className={inputCls}
+                  name="shipping_name"
+                  autoComplete="shipping name"
+                  placeholder="받는 분"
+                  value={manual.name}
+                  onChange={(e) => setManualField('name', e.target.value)}
+                />
+                <input
+                  className={inputCls}
+                  name="shipping_phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="shipping tel"
+                  placeholder="연락처 (010-0000-0000)"
+                  value={manual.phone}
+                  onChange={(e) => setManualField('phone', e.target.value)}
+                />
                 <div className="sm:col-span-2 flex gap-2">
                   <input
                     className={`${inputCls} max-w-[150px] bg-surface-soft cursor-pointer`}
+                    name="shipping_postal_code"
+                    autoComplete="shipping postal-code"
                     placeholder="우편번호"
                     value={manual.postal_code}
                     readOnly
@@ -428,6 +491,8 @@ export default function CheckoutPage() {
                 </div>
                 <input
                   className={`${inputCls} sm:col-span-2 bg-surface-soft cursor-pointer`}
+                  name="shipping_address"
+                  autoComplete="shipping address-line1"
                   placeholder="주소 (주소 찾기로 입력)"
                   value={manual.address}
                   readOnly
@@ -435,9 +500,11 @@ export default function CheckoutPage() {
                 />
                 <input
                   className={`${inputCls} sm:col-span-2`}
+                  name="shipping_address_detail"
+                  autoComplete="shipping address-line2"
                   placeholder="상세 주소 입력 (동/호수 등)"
                   value={manual.detail_address}
-                  onChange={(e) => setManual({ ...manual, detail_address: e.target.value })}
+                  onChange={(e) => setManualField('detail_address', e.target.value)}
                 />
                 <label className="sm:col-span-2 flex items-center gap-2.5 text-sm text-ink cursor-pointer">
                   <input
@@ -497,15 +564,15 @@ export default function CheckoutPage() {
 
             <div className="space-y-2 text-sm">
               <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={agree.terms} onChange={(e) => setAgree({ ...agree, terms: e.target.checked })} className="accent-[var(--color-primary)]" />
+                <input type="checkbox" checked={agree.terms} onChange={(e) => setAgree((prev) => ({ ...prev, terms: e.target.checked }))} className="accent-[var(--color-primary)]" />
                 <span className="text-ink">[필수] <Link href="/terms" target="_blank" className="text-primary hover:underline">이용약관</Link>에 동의합니다</span>
               </label>
               <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={agree.privacy} onChange={(e) => setAgree({ ...agree, privacy: e.target.checked })} className="accent-[var(--color-primary)]" />
+                <input type="checkbox" checked={agree.privacy} onChange={(e) => setAgree((prev) => ({ ...prev, privacy: e.target.checked }))} className="accent-[var(--color-primary)]" />
                 <span className="text-ink">[필수] <Link href="/privacy" target="_blank" className="text-primary hover:underline">개인정보 처리방침</Link>에 동의합니다</span>
               </label>
               <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={agree.coupang} onChange={(e) => setAgree({ ...agree, coupang: e.target.checked })} className="accent-[var(--color-primary)]" />
+                <input type="checkbox" checked={agree.coupang} onChange={(e) => setAgree((prev) => ({ ...prev, coupang: e.target.checked }))} className="accent-[var(--color-primary)]" />
                 <span className="text-ink">[필수] 쿠팡 로켓그로스 입고 안내를 확인했습니다</span>
               </label>
             </div>
@@ -566,7 +633,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <Button className="w-full" onClick={handleSubmit} isLoading={submitting}>
+            <Button type="submit" className="w-full" isLoading={submitting}>
               {formatPrice(total)} 결제하기
             </Button>
             <p className="text-[11px] text-muted mt-3 leading-relaxed">
@@ -574,7 +641,7 @@ export default function CheckoutPage() {
             </p>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
