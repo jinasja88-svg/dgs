@@ -11,8 +11,10 @@ security definer
 set search_path = public
 as $$
 begin
-  -- service_role / DB 소유자(마이그레이션·대시보드)는 제한 없음
-  if coalesce(auth.role(), '') = 'service_role' or current_user in ('postgres', 'supabase_admin') then
+  -- 제한 대상은 API로 들어온 일반 사용자(anon/authenticated JWT)뿐.
+  -- service_role, JWT 없는 DB 직접 접속(마이그레이션·대시보드·가입 트리거)은 통과.
+  -- (security definer 안에서는 current_user가 함수 소유자로 바뀌므로 판별에 쓰지 않는다)
+  if coalesce(auth.role(), '') not in ('anon', 'authenticated') then
     return new;
   end if;
   if public.is_admin() then
