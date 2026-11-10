@@ -10,7 +10,7 @@ import { createAdminClient } from '@/lib/supabase-admin';
 import { getEcommerceGlossaryPrompt } from './lookup';
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
-const DEFAULT_DAILY_LIMIT = 200;
+const DEFAULT_DAILY_LIMIT = 1000;
 const DEFAULT_PREWARM_DAILY_LIMIT = 1000;
 
 type TranslationDirection = 'zh2ko' | 'ko2zh';
@@ -125,8 +125,10 @@ async function reserveTranslationBudget(
   return true;
 }
 
-const ZH_TO_KO_SYSTEM_PROMPT = `You are a Korean e-commerce product title translator for 1688/Alibaba sourcing.
-Translate Simplified Chinese product titles/options into natural Korean product-listing text.
+const ZH_TO_KO_SYSTEM_PROMPT = `You are a Korean e-commerce translator for 1688/Alibaba sourcing.
+Translate Simplified Chinese product titles, options, and seller shop names into natural Korean product-listing text.
+Translate the whole text: no Chinese characters may remain in the output (transliterate proper nouns into Hangul if needed).
+For shop names, keep the structure (region + name + business type), e.g. 广州市欧卡娜服饰店(个体工商户) → 광저우시 오카나 의류점(개인사업자).
 Rules:
 - Reply only with the Korean translation.
 - Keep brand names, model numbers, sizes, quantities, and material codes unchanged.
@@ -255,10 +257,23 @@ export async function translateZhToKo(text: string): Promise<string> {
   return result ?? text;
 }
 
+// 한 번에 보내는 문장 수. 작은 묶음을 병렬로 보내면 긴 단일 응답을 기다리는 것보다 빠르다.
+const BATCH_CHUNK_SIZE = 8;
+
 /**
- * 여러 중국어 텍스트를 단일 API 호출로 배치 번역
+ * 여러 중국어 텍스트를 배치 번역 (BATCH_CHUNK_SIZE 단위로 나눠 병렬 호출)
  */
 export async function translateZhToKoBatch(texts: string[]): Promise<string[]> {
+  if (texts.length <= BATCH_CHUNK_SIZE) return translateZhToKoChunk(texts);
+  const chunks: string[][] = [];
+  for (let i = 0; i < texts.length; i += BATCH_CHUNK_SIZE) {
+    chunks.push(texts.slice(i, i + BATCH_CHUNK_SIZE));
+  }
+  const results = await Promise.all(chunks.map(translateZhToKoChunk));
+  return results.flat();
+}
+
+async function translateZhToKoChunk(texts: string[]): Promise<string[]> {
   if (texts.length === 0) return [];
   if (texts.length === 1) {
     return [await translateZhToKo(texts[0])];

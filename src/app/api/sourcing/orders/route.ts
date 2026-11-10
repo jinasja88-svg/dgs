@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     shipping_address_label,
     business_info,
     terms_agreed,
+    idempotency_key,
   } = body as {
     items: Array<{ product_id: string; title: string; image: string; sku_id?: string; sku_name?: string; quantity: number; price_cny: number; price_krw: number }>;
     shipping_address: {
@@ -68,7 +69,21 @@ export async function POST(request: NextRequest) {
     shipping_address_label?: string;
     business_info: Partial<BusinessInfo> | null;
     terms_agreed: { terms?: boolean; privacy?: boolean; coupang?: boolean } | null;
+    idempotency_key?: string;
   };
+  const idempotencyKey =
+    typeof idempotency_key === 'string' && /^[\w-]{8,64}$/.test(idempotency_key) ? idempotency_key : null;
+
+  // 같은 체크아웃 시도에서 이미 만든 주문이 있으면 그대로 반환 (재전송·더블클릭)
+  if (idempotencyKey) {
+    const { data: existingOrder } = await supabase
+      .from('sourcing_orders')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+    if (existingOrder) return NextResponse.json(existingOrder, { status: 200 });
+  }
 
   // 입력값 검증
   if (!Array.isArray(rawItems) || rawItems.length === 0) {
@@ -186,6 +201,7 @@ export async function POST(request: NextRequest) {
       shipping_fee,
       shipping_address: normalizedShippingAddress,
       business_info: savedBusinessInfo,
+      idempotency_key: idempotencyKey,
       terms_agreed: {
         terms: true,
         privacy: true,
@@ -197,6 +213,16 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
+    // 동시에 들어온 같은 키의 요청이 먼저 INSERT 했으면(unique 위반) 그 주문을 반환
+    if (error.code === '23505' && idempotencyKey) {
+      const { data: raced } = await supabase
+        .from('sourcing_orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+      if (raced) return NextResponse.json(raced, { status: 200 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

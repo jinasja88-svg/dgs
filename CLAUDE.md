@@ -46,7 +46,7 @@ All product data comes from **TMAPI** (`api.tmapi.io`), a paid third-party REST 
 - **`client.ts`** — `TmapiClient` class: `searchByKeyword`, `searchByImage`, `getItemDetail` (supports `language=ko` for Korean responses). 15s timeout, 2-retry exponential backoff, rate-limit handling.
 - **`types.ts`** — TMAPI raw response types
 - **`mapper.ts`** — Maps TMAPI responses to `SourcingProduct` domain model. Three mappers: `mapSearchItemToSourcingProduct`, `mapItemDetailToSourcingProduct`, `mapImageSearchItemToSourcingProduct`
-- **`cache.ts`** — LRU cache (500 entries), TTL constants: `CACHE_TTL.SEARCH` (5m), `CACHE_TTL.DETAIL` (15m), `CACHE_TTL.IMAGE_SEARCH` (10m)
+- **`cache.ts`** — LRU cache (500 entries), TTL constants: `CACHE_TTL.SEARCH` (30m), `CACHE_TTL.DETAIL` (15m), `CACHE_TTL.IMAGE_SEARCH` (10m)
 - **`errors.ts`** — `TmapiError`, `TmapiRateLimitError`, `TmapiAuthError`
 - **`index.ts`** — Singleton `getTmapiClient()` (reads `TMAPI_API_TOKEN`), re-exports `tmapiCache` and `CACHE_TTL`
 
@@ -158,7 +158,7 @@ TMAPI_API_TOKEN                # TMAPI (api.tmapi.io) subscription token
 CLAUDE123                      # Primary Claude API key for sourcing translation
 CLAUDE321                      # Fallback Claude API key (used when CLAUDE123 is rate-limited / out of credit)
 TRANSLATION_MODEL              # Optional — claude-* model id, default claude-sonnet-5-5
-TRANSLATION_DAILY_LIMIT        # Optional — default 200 HF translation calls/day, 0 disables, -1 unlimited
+TRANSLATION_DAILY_LIMIT        # Optional — default 1000 Claude translation calls/day, 0 disables, -1 unlimited
 TRANSLATION_PREWARM_DAILY_LIMIT # Optional — default 1000 prewarm translation calls/day (separate budget from live)
 CRON_SECRET                    # Bearer secret for /api/admin/translation-prewarm cron/manual trigger
 ADMIN_EMAILS                   # Comma-separated admin email whitelist

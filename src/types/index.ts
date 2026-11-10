@@ -176,6 +176,8 @@ export interface SourcingSku {
 
 export interface SourcingSeller {
   name: string;
+  /** 번역 전 중국어 판매자명 */
+  name_zh?: string;
   rating?: number;
   years?: number;
   location?: string;

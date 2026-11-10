@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createAdminClient } from '@/lib/supabase-admin';
 
 // GET /api/sourcing/reviews?order_id=xxx
 export async function GET(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   // 주문 소유권 확인
   const { data: order } = await supabase
     .from('sourcing_orders')
-    .select('id, status')
+    .select('id, status, items')
     .eq('id', body.order_id)
     .eq('user_id', user.id)
     .single();
@@ -60,13 +61,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '이미 리뷰를 작성하셨습니다' }, { status: 409 });
   }
 
-  const { data, error } = await supabase
+  // 상품 상세의 리뷰 조회용으로 주문 상품 ID를 함께 저장
+  const productIds = Array.isArray(order.items)
+    ? [...new Set((order.items as Array<{ product_id?: string }>).map((i) => i.product_id).filter((id): id is string => !!id))]
+    : [];
+
+  // 리뷰 INSERT는 RLS로 사용자에게 막혀 있으므로, 소유권·배송완료 검증 후 service role로 기록
+  const { data, error } = await createAdminClient()
     .from('sourcing_reviews')
     .insert({
       order_id: body.order_id,
       user_id: user.id,
       rating: body.rating,
       comment: body.comment?.trim() || null,
+      product_ids: productIds,
     })
     .select()
     .single();

@@ -324,8 +324,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ produc
         <div>
           <div className="bg-white rounded-[var(--radius-lg)] border border-border-light p-6">
             <h1 className="text-xl font-bold text-text-primary mb-1">{displayProduct!.title}</h1>
-            {displayProduct!.title_zh && (
-              <p className="text-sm text-text-tertiary mb-4">{displayProduct!.title_zh}</p>
+            {/* 번역된 상품명 아래에는 원문을 기본으로 숨기고, 1688 검색·대조용으로만 펼쳐 보게 한다 */}
+            {displayProduct!.title_zh && /[\u4e00-\u9fff]/.test(displayProduct!.title_zh) ? (
+              <details className="mb-4 text-sm text-text-tertiary">
+                <summary className="cursor-pointer select-none w-fit">중국어 원문 보기</summary>
+                <p className="mt-1 break-all">{displayProduct!.title_zh}</p>
+              </details>
+            ) : (
+              <div className="mb-4" />
             )}
 
             <div className="flex items-baseline gap-3 mb-6">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -65,6 +65,8 @@ export default function CheckoutPage() {
   const [loaded, setLoaded] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   // 결제 실패 후 재시도 시 중복 주문 생성을 막기 위해 생성된 주문을 기억
+  // 이 체크아웃 화면에서의 주문 생성 요청을 1건으로 묶는 키 (더블클릭·동시 요청 방지)
+  const idempotencyKey = useRef<string>(crypto.randomUUID());
   const [pendingOrder, setPendingOrder] = useState<{
     order_number: string;
     amount: number;
@@ -142,7 +144,6 @@ export default function CheckoutPage() {
   }, [router]);
 
   const subtotal = items.reduce((s, i) => s + i.price_krw * i.quantity, 0);
-  const subtotalCny = items.reduce((s, i) => s + i.price_cny * i.quantity, 0);
 
   const shippingAddress = useMemo(() => {
     const sel = addresses.find((a) => a.id === selectedAddressId);
@@ -283,8 +284,7 @@ export default function CheckoutPage() {
               price_cny: i.price_cny,
               price_krw: i.price_krw,
             })),
-            total_cny: subtotalCny,
-            total_krw: subtotal,
+            idempotency_key: idempotencyKey.current,
             shipping_address: submittedShippingAddress,
             save_shipping_address:
               !selectedAddress && saveManualAddress,

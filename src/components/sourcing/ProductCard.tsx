@@ -152,10 +152,6 @@ export default function ProductCard({
           </h3>
         </Link>
 
-        {product.title_zh && product.title_zh !== product.title && (
-          <p className="text-xs text-muted line-clamp-1">{product.title_zh}</p>
-        )}
-
         {(product.seller?.name || (product.min_order && product.min_order > 1)) && (
           <p className="text-xs text-muted truncate">
             {product.seller?.name}

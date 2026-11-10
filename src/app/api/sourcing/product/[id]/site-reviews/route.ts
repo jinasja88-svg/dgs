@@ -10,23 +10,13 @@ export async function GET(
   try {
     const supabase = createAdminClient();
 
-    // 해당 상품이 포함된 주문 ID 조회
-    const { data: orders, error: ordersError } = await supabase
-      .from('sourcing_orders')
-      .select('id')
-      .contains('items', [{ product_id: id }]);
-
-    if (ordersError) throw ordersError;
-    if (!orders || orders.length === 0) return NextResponse.json({ reviews: [] });
-
-    const orderIds = orders.map((o) => o.id);
-
-    // 해당 주문들의 리뷰 조회
+    // product_ids GIN 인덱스로 해당 상품 리뷰만 바로 조회
     const { data: reviews, error: reviewsError } = await supabase
       .from('sourcing_reviews')
       .select('id, rating, comment, created_at')
-      .in('order_id', orderIds)
-      .order('created_at', { ascending: false });
+      .contains('product_ids', [id])
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (reviewsError) throw reviewsError;
 
