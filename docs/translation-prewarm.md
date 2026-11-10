@@ -12,7 +12,7 @@
      완전일치 → 구분자 분할(`黑色/XL`) → 부분 치환(전체가 한국어로 떨어질 때만 채택, 아니면 LLM에 위임)
    - `PROMPT_GLOSSARY`: 고빈도 용어를 **LLM 시스템 프롬프트에 주입**해 긴 상품명도 일관 용어로 번역.
 2. **Supabase 영구 캐시 (`cache.ts`, `translation_cache`)** — TTL 없음. 한 번 번역하면 영구 재사용.
-3. **HF 기계번역 (`translator.ts`)** — `TRANSLATION_MODEL`(기본 `Qwen/Qwen2.5-7B-Instruct`), featherless-ai 라우터.
+3. **Claude 기계번역 (`translator.ts`)** — `claude-sonnet-5-5`(effort low), 키 `CLAUDE123` → `CLAUDE321` 자동 전환.
    `temperature 0.1`, 도메인 인식 프롬프트 + 용어집 주입.
 
 > 품질을 더 올리려면: ① 용어집(`lookup.ts`) 항목 추가가 가성비 최고, ② `TRANSLATION_MODEL`을

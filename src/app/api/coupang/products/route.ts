@@ -47,9 +47,11 @@ export async function GET(request: NextRequest) {
     .select('*', { count: 'exact' });
 
   // 키워드 검색
-  if (keyword) {
+  // .or() 필터 문법(쉼표·괄호)으로 조건을 주입하지 못하도록 해당 문자를 제거하고 LIKE 와일드카드는 이스케이프
+  const safeKeyword = escapeLike(keyword.replace(/[,()"]/g, ' ').trim());
+  if (safeKeyword) {
     query = query.or(
-      `product_name.ilike.%${keyword}%,main_keyword.ilike.%${keyword}%,sub_keyword1.ilike.%${keyword}%,sub_keyword2.ilike.%${keyword}%`
+      `product_name.ilike.%${safeKeyword}%,main_keyword.ilike.%${safeKeyword}%,sub_keyword1.ilike.%${safeKeyword}%,sub_keyword2.ilike.%${safeKeyword}%`
     );
   }
 

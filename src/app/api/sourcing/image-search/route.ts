@@ -3,8 +3,18 @@ import { getTmapiClient, CACHE_TTL, mapImageSearchItemToSourcingProduct } from '
 import { getExchangeRate } from '@/lib/exchange-rate';
 import { logApiCall } from '@/lib/api-logger';
 import { getCached, setCached } from '@/lib/persistent-cache';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { consumeDailyQuota } from '@/lib/usage-quota';
+import { createHash } from 'node:crypto';
 
 export async function POST(request: NextRequest) {
+  // 캐시 미스마다 유료 TMAPI 호출이 발생하므로 로그인 사용자만 허용
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: '이미지 검색은 로그인 후 이용할 수 있습니다.' }, { status: 401 });
+  }
+
   let body: { image_url?: string; page?: number };
   try {
     body = await request.json();
@@ -13,15 +23,24 @@ export async function POST(request: NextRequest) {
   }
 
   const { image_url, page = 1 } = body;
-  if (!image_url) {
+  if (!image_url || typeof image_url !== 'string') {
     return NextResponse.json({ error: 'image_url은 필수입니다' }, { status: 400 });
+  }
+  if (!/^https:\/\//.test(image_url) && !image_url.startsWith('data:image/')) {
+    return NextResponse.json({ error: '지원하지 않는 이미지 주소입니다' }, { status: 400 });
   }
 
   // 캐시 확인
-  const cacheKey = `tmapi:img-search:${image_url}:${page}`;
+  // base64 업로드 이미지도 들어오므로 원문 대신 해시를 키로 사용
+  const imageHash = createHash('sha256').update(image_url).digest('hex');
+  const cacheKey = `tmapi:img-search:${imageHash}:${page}`;
   const cached = await getCached<unknown>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
+  }
+
+  if (!(await consumeDailyQuota(user.id, 'image-search'))) {
+    return NextResponse.json({ error: '오늘 이미지 검색 한도를 모두 사용했습니다. 내일 다시 시도해주세요.' }, { status: 429 });
   }
 
   try {

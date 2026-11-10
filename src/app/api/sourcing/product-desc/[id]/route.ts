@@ -1,6 +1,25 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { CACHE_TTL, getCachedItemDetail } from '@/lib/tmapi';
 import { getCached, setCached } from '@/lib/persistent-cache';
+import sanitizeHtml from 'sanitize-html';
+
+// 판매자가 작성한 HTML을 우리 도메인에서 렌더하므로 스크립트/이벤트 핸들러/iframe 등을 제거한다
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [
+    'p', 'div', 'span', 'br', 'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
+    'strong', 'b', 'em', 'i', 'u', 'font', 'center', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li',
+  ],
+  allowedAttributes: {
+    '*': ['style', 'align', 'width', 'height'],
+    img: ['src', 'alt', 'width', 'height', 'style'],
+    td: ['colspan', 'rowspan', 'style', 'width', 'align'],
+    font: ['color', 'size'],
+  },
+  allowedSchemes: ['https'],
+  allowProtocolRelative: false,
+  // 이미지 프록시 경로(상대 URL)는 허용
+  allowedSchemesAppliedToAttributes: ['src', 'href'],
+};
 
 export async function GET(
   _request: NextRequest,
@@ -8,7 +27,8 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const cacheKey = `tmapi:desc:${id}`;
+  // v2: sanitize 적용 이전에 저장된 캐시를 재사용하지 않도록 키 변경
+  const cacheKey = `tmapi:desc:v2:${id}`;
   const cached = await getCached<{ html: string }>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
@@ -64,7 +84,7 @@ export async function GET(
       (_match, url) => `src='/api/image-proxy?url=${encodeURIComponent(url)}'`
     );
 
-    const result = { html };
+    const result = { html: sanitizeHtml(html, SANITIZE_OPTIONS) };
     await setCached(cacheKey, result, CACHE_TTL.DETAIL);
 
     return NextResponse.json(result);

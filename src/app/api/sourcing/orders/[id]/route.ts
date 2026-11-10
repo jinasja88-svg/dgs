@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createAdminClient } from '@/lib/supabase-admin';
 
 export async function GET(
   _request: NextRequest,
@@ -85,11 +86,13 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabase
+  // 주문 UPDATE는 RLS로 사용자에게 막혀 있으므로, 소유자·상태 전이 검증 후 service role로 반영
+  const { data, error } = await createAdminClient()
     .from('sourcing_orders')
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)
+    .eq('status', currentOrder.status) // 조회 이후 상태가 바뀌었으면 반영하지 않음
     .select()
     .single();
 

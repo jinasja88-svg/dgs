@@ -1,6 +1,6 @@
 /**
  * 1688 상품 한국어 번역 모듈
- * - 상품명: HuggingFace Qwen API (Supabase 캐시 우선)
+ * - 상품명: Claude Sonnet API (Supabase 캐시 우선)
  * - SKU 속성: 정적 룩업 우선 → 미스 시 API
  */
 
@@ -8,6 +8,12 @@ import type { SourcingProduct } from '@/types';
 import { translateZhToKo, translateKoToZh, translateZhToKoBatch } from './translator';
 import { lookupZhToKo, containsChinese, containsKorean } from './lookup';
 import { getCachedAsync, setCachedAsync } from './cache';
+
+// 번역 실패 시 translator는 원문을 그대로 돌려주므로, 원문이 영구 캐시에 박히지 않도록 걸러낸다
+async function cacheIfTranslated(text: string, direction: 'zh2ko' | 'ko2zh', translated: string): Promise<void> {
+  if (!translated || translated === text) return;
+  await setCachedAsync(text, direction, translated);
+}
 
 // 프리웜 등 별도 예산 경로에서 번역 출처(live/prewarm)를 지정할 때 사용
 export { runWithTranslationSource } from './translator';
@@ -23,7 +29,7 @@ async function zhToKoCached(text: string): Promise<string> {
   if (cached !== null) return cached;
 
   const translated = await translateZhToKo(text);
-  await setCachedAsync(text, 'zh2ko', translated);
+  await cacheIfTranslated(text, 'zh2ko', translated);
   return translated;
 }
 
@@ -67,7 +73,7 @@ export async function translateBatch(texts: string[]): Promise<string[]> {
     await Promise.all(
       toTranslate.map(async ({ idx, text }, j) => {
         results[idx] = batchTranslated[j];
-        await setCachedAsync(text, 'zh2ko', batchTranslated[j]);
+        await cacheIfTranslated(text, 'zh2ko', batchTranslated[j]);
       })
     );
   }
@@ -83,7 +89,7 @@ export async function translateSearchQuery(keyword: string): Promise<string> {
   if (cached !== null) return cached;
 
   const translated = await translateKoToZh(keyword);
-  await setCachedAsync(keyword, 'ko2zh', translated);
+  await cacheIfTranslated(keyword, 'ko2zh', translated);
   return translated;
 }
 
@@ -147,7 +153,7 @@ export async function translateProducts(
       toTranslate.map(async ({ idx, text }, j) => {
         const translated = batchTranslated[j];
         titleResults[idx] = translated;
-        await setCachedAsync(text, 'zh2ko', translated);
+        await cacheIfTranslated(text, 'zh2ko', translated);
       })
     );
   }

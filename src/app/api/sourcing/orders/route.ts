@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createAdminClient } from '@/lib/supabase-admin';
 import { generateOrderNumber } from '@/lib/utils';
 import { getDomesticShippingFee } from '@/lib/shipping';
+import { verifyOrderItemPrices, OrderPriceError } from '@/lib/sourcing/order-pricing';
 import type { BusinessInfo } from '@/types';
 
 function clean(value: unknown): string {
@@ -45,20 +47,14 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    items,
-    total_cny,
-    total_krw,
-    service_fee,
+    items: rawItems,
     shipping_address,
     save_shipping_address,
     shipping_address_label,
     business_info,
     terms_agreed,
   } = body as {
-    items: Array<{ product_id: string; title: string; image: string; sku_name?: string; quantity: number; price_cny: number; price_krw: number }>;
-    total_cny: number;
-    total_krw: number;
-    service_fee: number;
+    items: Array<{ product_id: string; title: string; image: string; sku_id?: string; sku_name?: string; quantity: number; price_cny: number; price_krw: number }>;
     shipping_address: {
       name?: string;
       recipient?: string;
@@ -75,11 +71,11 @@ export async function POST(request: NextRequest) {
   };
 
   // 입력값 검증
-  if (!Array.isArray(items) || items.length === 0) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
     return NextResponse.json({ error: '주문 상품이 없습니다.' }, { status: 400 });
   }
 
-  for (const item of items) {
+  for (const item of rawItems) {
     if (!item.product_id || !item.title || typeof item.quantity !== 'number' || item.quantity < 1) {
       return NextResponse.json({ error: '상품 정보가 올바르지 않습니다.' }, { status: 400 });
     }
@@ -88,9 +84,29 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (typeof total_krw !== 'number' || total_krw <= 0) {
-    return NextResponse.json({ error: '총 금액이 올바르지 않습니다.' }, { status: 400 });
+  // 저장할 필드만 골라내고 수량은 정수로 고정
+  const items = rawItems.map((item) => ({
+    product_id: String(item.product_id),
+    title: String(item.title),
+    image: typeof item.image === 'string' ? item.image : '',
+    sku_id: typeof item.sku_id === 'string' && item.sku_id ? item.sku_id : undefined,
+    sku_name: typeof item.sku_name === 'string' ? item.sku_name : undefined,
+    quantity: Math.floor(item.quantity),
+    price_cny: item.price_cny,
+    price_krw: Math.round(item.price_krw),
+  }));
+
+  // 단가는 1688 원장과 대조하고, 합계는 서버에서 계산 (클라이언트 합계 신뢰하지 않음)
+  try {
+    await verifyOrderItemPrices(items);
+  } catch (err) {
+    if (err instanceof OrderPriceError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    throw err;
   }
+  const total_krw = items.reduce((sum, i) => sum + i.price_krw * i.quantity, 0);
+  const total_cny = Math.round(items.reduce((sum, i) => sum + i.price_cny * i.quantity, 0) * 100) / 100;
 
   const normalizedShippingAddress = {
     name: clean(shipping_address?.name) || clean(shipping_address?.recipient),
@@ -157,15 +173,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '잠시 후 다시 시도해주세요. (중복 주문 방지)' }, { status: 429 });
   }
 
-  const { data, error } = await supabase
+  // 주문 INSERT는 RLS로 사용자에게 막혀 있으므로, 위에서 검증을 마친 뒤 service role로 기록
+  const { data, error } = await createAdminClient()
     .from('sourcing_orders')
     .insert({
       user_id: user.id,
       order_number: generateOrderNumber(),
       items,
-      total_cny: total_cny || 0,
+      total_cny,
       total_krw,
-      service_fee: service_fee || 0,
+      service_fee: 0,
       shipping_fee,
       shipping_address: normalizedShippingAddress,
       business_info: savedBusinessInfo,

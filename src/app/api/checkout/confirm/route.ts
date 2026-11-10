@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createAdminClient } from '@/lib/supabase-admin';
 import { getPortonePayment, portoneMethodLabel } from '@/lib/portone';
 
 /**
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 4) 주문 확정
-  const { error: updateError } = await supabase
+  const { error: updateError } = await createAdminClient()
     .from('sourcing_orders')
     .update({
       status: 'paid',

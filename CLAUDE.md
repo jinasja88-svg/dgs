@@ -113,7 +113,7 @@ const result = await logApiCall('search', () => client.searchByKeyword(params));
 ### Exchange Rate & Translation
 
 - **`src/lib/exchange-rate.ts`** — Fetches CNY→KRW rate with 1-hour in-memory cache. Falls back to 208 KRW/CNY.
-- **`src/lib/translation/`** — Korean↔Chinese machine translation via HuggingFace chat completions (`translator.ts`; model from `TRANSLATION_MODEL`, default `Qwen/Qwen2.5-7B-Instruct`). Pipeline: static lookup table (`lookup.ts`) → Supabase persistent cache (`cache.ts`, `translation_cache` table) → HF API call. Daily call budget guarded by `translation_api_usage_daily` (`TRANSLATION_DAILY_LIMIT`). `translateProducts(products, { skipSkus: true })` translates product titles in the search route.
+- **`src/lib/translation/`** — Korean↔Chinese machine translation via the Claude API (`translator.ts`, `@anthropic-ai/sdk`; model `claude-sonnet-5-5`, overridable by a `claude-*` `TRANSLATION_MODEL`). Keys are tried in order `CLAUDE123` → `CLAUDE321` → `ANTHROPIC_API_KEY`; a key hitting 429/billing/auth errors is put on cooldown and the next key is used. Pipeline: static lookup table (`lookup.ts`) → Supabase persistent cache (`cache.ts`, `translation_cache` table) → Claude API call. Failed translations (original text returned) are not cached. Daily call budget guarded by `translation_api_usage_daily` (`TRANSLATION_DAILY_LIMIT`). `translateProducts(products, { skipSkus: true })` translates product titles in the search route.
 - **Translation prewarm** — `/api/admin/translation-prewarm` (GET/POST, cron `CRON_SECRET` or admin) pre-translates popular `search_history` keywords + default/category first pages into the permanent cache, using a **separate** `prewarm` budget (`TRANSLATION_PREWARM_DAILY_LIMIT`) via `runWithTranslationSource` (`AsyncLocalStorage`). Live search and prewarm share `runKeywordSearch()` in `src/lib/sourcing/search.ts` so cache keys never drift. Scheduled in `vercel.json`. See `docs/translation-prewarm.md`.
 
 ### Client-Side State
@@ -155,8 +155,9 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY      # Required for api-logger and admin operations
 TMAPI_API_TOKEN                # TMAPI (api.tmapi.io) subscription token
-HF_API_TOKEN                   # HF Inference Providers token for sourcing translation
-TRANSLATION_MODEL              # Optional — default Qwen/Qwen2.5-7B-Instruct
+CLAUDE123                      # Primary Claude API key for sourcing translation
+CLAUDE321                      # Fallback Claude API key (used when CLAUDE123 is rate-limited / out of credit)
+TRANSLATION_MODEL              # Optional — claude-* model id, default claude-sonnet-5-5
 TRANSLATION_DAILY_LIMIT        # Optional — default 200 HF translation calls/day, 0 disables, -1 unlimited
 TRANSLATION_PREWARM_DAILY_LIMIT # Optional — default 1000 prewarm translation calls/day (separate budget from live)
 CRON_SECRET                    # Bearer secret for /api/admin/translation-prewarm cron/manual trigger
